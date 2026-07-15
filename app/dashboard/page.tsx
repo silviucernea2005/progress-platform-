@@ -52,4 +52,54 @@ export default function DashboardPage() {
             Niciun proiect activ. <Link href="/projects/new" style={{ color: '#185FA5' }}>Adauga primul proiect</Link>
           </div>
         ) : (
-          <div style={{
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 32 }}>
+            {active.map((proj: any) => (
+              <Link key={proj.id} href={`/reports/new?project=${proj.id}`} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, textDecoration: 'none', display: 'block' }}>
+                <div style={{ fontWeight: 500, color: '#111827' }}>{proj.name}</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{proj.location || '—'}</div>
+                <div style={{ marginTop: 12, fontSize: 12, color: '#185FA5' }}>{reports.filter(r => r.project_id === proj.id).length} rapoarte →</div>
+              </Link>
+            ))}
+          </div>
+        )}
+        <h2 style={{ fontSize: 17, fontWeight: 500, color: '#374151', marginBottom: 16 }}>Ultimele rapoarte</h2>
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontWeight: 500, color: '#6b7280' }}>Proiect</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontWeight: 500, color: '#6b7280' }}>Perioada</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontWeight: 500, color: '#6b7280' }}>Progres</th>
+                <th style={{ padding: '12px 16px' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Se incarca...</td></tr>
+              : reports.slice(0, 8).map((r: any) => {
+                const acts = r.activities || []
+                const prog = acts.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
+                return (
+                  <tr key={r.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 500 }}>{r.project?.name || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: '#6b7280' }}>{r.period_start} – {r.period_end}</td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ height: 6, width: 80, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', background: '#185FA5', borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 500 }}>{prog.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                      <Link href={`/reports/${r.id}`} style={{ color: '#185FA5', fontSize: 12, textDecoration: 'none' }}>Vezi →</Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  )
+}
