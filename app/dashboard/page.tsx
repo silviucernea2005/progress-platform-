@@ -15,6 +15,17 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedProject, setSelectedProject] = useState<string>('all')
 
+  // Remember which project was last being worked on, so "back to dashboard" from a
+  // report shows that project instead of resetting to "All Projects"
+  useEffect(() => {
+    const saved = localStorage.getItem('dashboard_selected_project')
+    if (saved) setSelectedProject(saved)
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('dashboard_selected_project', selectedProject)
+  }, [selectedProject])
+
   useEffect(() => {
     Promise.all([
       fetch('/api/projects').then(r => r.json()),
@@ -37,6 +48,20 @@ export default function DashboardPage() {
   function getReportProgress(r: any) {
     const acts = r.activities || []
     return acts.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
+  }
+
+  // Photos live only in this browser's localStorage (per report id) — check for a thumbnail/attachment indicator
+  function getPhotoInfo(reportId: string): { hasAny: boolean; thumb: string | null } {
+    try {
+      const saved = localStorage.getItem(`report_photos_${reportId}`)
+      if (!saved) return { hasAny: false, thumb: null }
+      const photos = JSON.parse(saved)
+      if (!Array.isArray(photos) || !photos.length) return { hasAny: false, thumb: null }
+      const firstImage = photos.find((p: string) => typeof p === 'string' && p.startsWith('data:image'))
+      return { hasAny: true, thumb: firstImage || null }
+    } catch {
+      return { hasAny: false, thumb: null }
+    }
   }
 
   const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 7, padding: '7px 15px', fontSize: 13, cursor: 'pointer', fontWeight: 500, textDecoration: 'none', display: 'inline-block' } as any)
@@ -153,7 +178,14 @@ export default function DashboardPage() {
                             </div>
                           </td>
                           <td style={{ padding: '11px 16px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                              {(() => {
+                                const { hasAny, thumb } = getPhotoInfo(r.id)
+                                if (!hasAny) return null
+                                return thumb
+                                  ? <img src={thumb} title="Has photos" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', border: '1px solid #e5e7eb' }} />
+                                  : <span title="Has attachments" style={{ fontSize: 14 }}>📎</span>
+                              })()}
                               <Link href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
                               <Link href={`/reports/${r.id}/edit`} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
                               <button onClick={async () => { if(confirm('Delete this report?')) { await fetch(`/api/reports/${r.id}`, {method:'DELETE'}); setReports(prev => prev.filter(x => x.id !== r.id)) } }}
