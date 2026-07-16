@@ -194,6 +194,30 @@ export default function ReportPage() {
     return images
   }
 
+  // Resize/compress images before storing — avoids blowing past the browser's localStorage
+  // quota (~5-10MB) when someone drops several full-resolution site photos at once.
+  function compressImage(dataUrl: string, maxWidth = 1400, quality = 0.72): Promise<string> {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        let { width, height } = img
+        if (width > maxWidth) {
+          height = Math.round(height * (maxWidth / width))
+          width = maxWidth
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(dataUrl); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => resolve(dataUrl)
+      img.src = dataUrl
+    })
+  }
+
   // Photo drag & drop — supports images, PDF, Excel, Word (extract embedded images/pages automatically)
   async function handlePhotoDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -202,74 +226,88 @@ export default function ReportPage() {
     if (!files.length) return
     setUploadingPhoto(true)
     const newPhotos: string[] = []
-    for (const file of files) {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader()
-        await new Promise<void>(res => {
-          reader.onload = () => { newPhotos.push(reader.result as string); res() }
-          reader.readAsDataURL(file)
-        })
-      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        // Render first page of PDF using PDF.js
-        const reader = new FileReader()
-        await new Promise<void>(res => {
-          reader.onload = async () => {
-            try {
-              const pdfjsLib = (window as any).pdfjsLib
-              if (pdfjsLib) {
-                const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise
-                const numPages = pdf.numPages
-                for (let p = 1; p <= Math.min(numPages, 10); p++) {
-                  const page = await pdf.getPage(p)
-                  const viewport = page.getViewport({ scale: 1.5 })
-                  const canvas = document.createElement('canvas')
-                  canvas.width = viewport.width
-                  canvas.height = viewport.height
-                  await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise
-                  newPhotos.push(canvas.toDataURL('image/jpeg', 0.85))
+    try {
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader()
+          const dataUrl = await new Promise<string>((res, rej) => {
+            reader.onload = () => res(reader.result as string)
+            reader.onerror = () => rej(new Error('read failed'))
+            reader.readAsDataURL(file)
+          })
+          newPhotos.push(await compressImage(dataUrl))
+        } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+          // Render first pages of PDF using PDF.js
+          const reader = new FileReader()
+          await new Promise<void>(res => {
+            reader.onload = async () => {
+              try {
+                const pdfjsLib = (window as any).pdfjsLib
+                if (pdfjsLib) {
+                  const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise
+                  const numPages = pdf.numPages
+                  for (let p = 1; p <= Math.min(numPages, 10); p++) {
+                    const page = await pdf.getPage(p)
+                    const viewport = page.getViewport({ scale: 1.5 })
+                    const canvas = document.createElement('canvas')
+                    canvas.width = viewport.width
+                    canvas.height = viewport.height
+                    await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise
+                    newPhotos.push(await compressImage(canvas.toDataURL('image/jpeg', 0.85)))
+                  }
                 }
-              }
-            } catch {}
-            res()
-          }
-          reader.readAsArrayBuffer(file)
-        })
-      }
-      // Excel/Word (xlsx/docx): extract embedded images automatically
-      else if (file.name.match(/\.(xlsx|docx)$/i)) {
-        try {
-          const images = await extractOfficeImages(file)
-          if (images.length) {
-            newPhotos.push(...images)
-          } else {
+              } catch {}
+              res()
+            }
+            reader.readAsArrayBuffer(file)
+          })
+        }
+        // Excel/Word (xlsx/docx): extract embedded images automatically
+        else if (file.name.match(/\.(xlsx|docx)$/i)) {
+          try {
+            const images = await extractOfficeImages(file)
+            if (images.length) {
+              for (const img of images) newPhotos.push(await compressImage(img))
+            } else {
+              const ext = file.name.split('.').pop()?.toLowerCase()
+              const icon = ext === 'xlsx' ? '📊' : '📄'
+              newPhotos.push(`data:text/plain,${icon} ${file.name} (no images found inside)`)
+            }
+          } catch {
             const ext = file.name.split('.').pop()?.toLowerCase()
             const icon = ext === 'xlsx' ? '📊' : '📄'
-            newPhotos.push(`data:text/plain,${icon} ${file.name} (no images found inside)`)
+            newPhotos.push(`data:text/plain,${icon} ${file.name}`)
           }
-        } catch {
+        }
+        // Old binary .xls / .doc — not a ZIP, images can't be extracted this way
+        else if (file.name.match(/\.(xls|doc)$/i)) {
           const ext = file.name.split('.').pop()?.toLowerCase()
-          const icon = ext === 'xlsx' ? '📊' : '📄'
-          newPhotos.push(`data:text/plain,${icon} ${file.name}`)
+          const icon = ext?.includes('xl') ? '📊' : '📄'
+          newPhotos.push(`data:text/plain,${icon} ${file.name} (old format — save as .xlsx/.docx to extract images)`)
         }
       }
-      // Old binary .xls / .doc — not a ZIP, images can't be extracted this way
-      else if (file.name.match(/\.(xls|doc)$/i)) {
-        const ext = file.name.split('.').pop()?.toLowerCase()
-        const icon = ext?.includes('xl') ? '📊' : '📄'
-        newPhotos.push(`data:text/plain,${icon} ${file.name} (old format — save as .xlsx/.docx to extract images)`)
-      }
+    } catch {
+      // Continue to save whatever succeeded rather than losing everything
     }
     const updated = [...photos, ...newPhotos]
     setPhotos(updated)
-    localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
+    try {
+      localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
+    } catch {
+      alert('Nu mai există spațiu de stocare în acest browser pentru toate pozele. Pozele adăugate acum sunt vizibile, dar nu au putut fi salvate — șterge câteva poze mai vechi (sau folosește "🗑 Delete all photos") și încearcă din nou cu un set mai mic.')
+    }
     setUploadingPhoto(false)
     setPhotosJustSaved(false)
   }
 
   function savePhotosNow() {
-    localStorage.setItem(`report_photos_${id}`, JSON.stringify(photos))
-    setPhotosJustSaved(true)
-    setTimeout(() => setPhotosJustSaved(false), 2500)
+    try {
+      localStorage.setItem(`report_photos_${id}`, JSON.stringify(photos))
+      setPhotosJustSaved(true)
+      setTimeout(() => setPhotosJustSaved(false), 2500)
+    } catch {
+      alert('Nu mai există spațiu de stocare în acest browser. Șterge câteva poze mai vechi și încearcă din nou.')
+    }
   }
 
   function deleteAllPhotos() {
@@ -736,6 +774,19 @@ ${photosHtml}
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* REPORT SWITCHER — jump between this project's reports. Live page only, never exported. */}
+        {allReports.length > 1 && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, color: '#6b7280', marginRight: 8 }}>📋 Report:</label>
+            <select value={String(id)} onChange={e => router.push(`/reports/${e.target.value}`)}
+              style={{ border: '1px solid #d1d5db', borderRadius: 7, padding: '6px 10px', fontSize: 12, color: MCORE_DARK, background: '#fff', cursor: 'pointer' }}>
+              {[...allReports].sort((a: any, b: any) => (b.period_end || '').localeCompare(a.period_end || '')).map((r: any) => (
+                <option key={r.id} value={r.id}>{r.period_start} – {r.period_end}</option>
+              ))}
+            </select>
           </div>
         )}
 
