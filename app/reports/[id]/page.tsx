@@ -27,6 +27,7 @@ export default function ReportPage() {
   const [dragOver, setDragOver] = useState(false)
   const [editingWeights, setEditingWeights] = useState(false)
   const [weights, setWeights] = useState<Record<number, number>>({})
+  const [photosJustSaved, setPhotosJustSaved] = useState(false)
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -256,12 +257,20 @@ export default function ReportPage() {
     setPhotos(updated)
     localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
     setUploadingPhoto(false)
+    setPhotosJustSaved(false)
+  }
+
+  function savePhotosNow() {
+    localStorage.setItem(`report_photos_${id}`, JSON.stringify(photos))
+    setPhotosJustSaved(true)
+    setTimeout(() => setPhotosJustSaved(false), 2500)
   }
 
   function removePhoto(idx: number) {
     const updated = photos.filter((_, i) => i !== idx)
     setPhotos(updated)
     localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
+    setPhotosJustSaved(false)
   }
 
   // New report with preserved progress
@@ -437,6 +446,192 @@ export default function ReportPage() {
   }, [allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart])
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Loading...</div>
+  const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
+  const lbl = { display: 'block' as any, fontSize: 11, color: '#6b7280', marginBottom: 3 }
+  const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 } as any)
+
+  // Client-side PDF export — opens in a NEW tab so the current report/dashboard is never lost,
+  // and includes the charts + photos which only exist in this browser (not on the server).
+  function exportPdfClientSide() {
+    const win = window.open('', '_blank')
+    if (!win) { alert('Please allow pop-ups for this site to export the PDF.'); return }
+
+    const mainChartImg = mainChartRef.current ? mainChartRef.current.toDataURL('image/png', 1.0) : ''
+    const tenderChartImg = tenderChartRef.current ? tenderChartRef.current.toDataURL('image/png', 1.0) : ''
+    const contractingChartImg = contractingChartRef.current ? contractingChartRef.current.toDataURL('image/png', 1.0) : ''
+    const constructionChartImg = constructionChartRef.current ? constructionChartRef.current.toDataURL('image/png', 1.0) : ''
+
+    const photoImgs = photos.filter(p => p.startsWith('data:image'))
+    const chartIncluded = allReports.length >= 1 && !!mainChartImg
+    const scoreColor = chartIncluded ? '#059669' : ORANGE
+
+    const actRows = acts.map((a: any) => {
+      const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
+      const contribution = (a.progress * w / 100).toFixed(2)
+      return `
+        <tr style="border-bottom:1px solid #f0f0f0">
+          <td style="padding:8px 12px;font-size:13px">${a.activity?.name}</td>
+          <td style="padding:8px 12px;text-align:center;font-size:13px">${w}%</td>
+          <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:600">${a.progress}%</td>
+          <td style="padding:8px 12px;text-align:center;font-size:13px;color:#185FA5">${contribution}%</td>
+          <td style="padding:8px 12px;text-align:center">
+            <div style="height:8px;background:#f0f0f0;border-radius:4px;overflow:hidden">
+              <div style="height:100%;background:${a.progress===100?'#1A1A2A':'#D46A28'};width:${a.progress}%;border-radius:4px"></div>
+            </div>
+          </td>
+          <td style="padding:8px 12px;text-align:center;font-size:11px;border-radius:99px;background:${a.progress===0?'#f5f5f5':a.progress<100?'#fef3c7':'#ecfdf5'};color:${a.progress===0?'#9ca3af':a.progress<100?'#92400e':'#065f46'}">${a.progress===0?'Not started':a.progress<100?'In progress':'Completed'}</td>
+        </tr>`
+    }).join('')
+
+    const mainChartHtml = mainChartImg ? `
+    <div class="section">
+      <h2>Works Progress · ${report.project?.name}</h2>
+      <div style="background:${GRAY_CHART};border-radius:12px;padding:16px">
+        <img src="${mainChartImg}" style="width:100%;display:block" />
+      </div>
+    </div>` : ''
+
+    const miniCharts = [
+      ['Tender', tenderChartImg, tenderTotal],
+      ['Contracting', contractingChartImg, contractingTotal],
+      ['Construction', constructionChartImg, constructionTotal],
+    ]
+    const miniChartsHtml = miniCharts.some(m => m[1]) ? `
+    <div class="section">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+        ${miniCharts.map(([label, img, total]) => `
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px;text-align:center">
+            ${img ? `<img src="${img}" style="width:100%;display:block" />` : ''}
+            ${Number(total) > 0 ? `<div style="font-size:11px;color:#6b7280;margin-top:4px">${label} total: ${total} days</div>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>` : ''
+
+    const photosHtml = photoImgs.length ? `
+    <div class="section">
+      <h2>Site Photos</h2>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${photoImgs.map(src => `<img src="${src}" style="width:100%;height:180px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;display:block" />`).join('')}
+      </div>
+    </div>` : ''
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Progress Report - ${report.project?.name}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; color: #1A1A2A; background: #fff; }
+  .header { background: #1A1A2A; color: white; padding: 24px 32px; display:flex; justify-content:space-between; align-items:center; }
+  .logo { font-size: 22px; font-weight: 900; background: #185FA5; padding: 6px 14px; border-radius: 8px; }
+  .logo-sub { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-top: 2px; }
+  .score-box { background: #2C2C3E; border-radius: 12px; padding: 20px 28px; margin: 24px; display:flex; justify-content:space-between; align-items:center; color:white; }
+  .score-title { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+  .score-num { font-size: 48px; font-weight: 800; color: ${scoreColor}; }
+  .progress-bar { height: 8px; background: rgba(255,255,255,0.15); border-radius: 99px; margin-top: 12px; overflow:hidden; }
+  .progress-fill { height: 100%; background: #D46A28; border-radius: 99px; }
+  .section { margin: 0 24px 20px; }
+  .section h2 { font-size: 14px; font-weight: 700; color: #1A1A2A; border-bottom: 2px solid #185FA5; padding-bottom: 6px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #1A1A2A; color: white; padding: 10px 12px; text-align: left; font-size: 12px; }
+  .text-box { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .text-card { background: #f9fafb; border-radius: 8px; padding: 14px; }
+  .text-card h3 { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .text-card p { font-size: 12px; color: #374151; line-height: 1.6; white-space: pre-wrap; }
+  .footer { background: #f5f5f3; padding: 12px 32px; font-size: 10px; color: #9ca3af; margin-top: 24px; text-align: center; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="logo">S7</div>
+      <div>
+        <div style="font-weight:700;font-size:14px">Square 7</div>
+        <div class="logo-sub">PART OF M.CORE</div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:13px;opacity:0.7">Progress Report</div>
+    <div style="font-size:11px;opacity:0.5">${report.period_start} – ${report.period_end}</div>
+  </div>
+</div>
+
+<div class="score-box">
+  <div>
+    <div class="score-title">${report.project?.name}</div>
+    <div style="font-size:12px;opacity:0.6;margin-top:4px">${report.project?.location || ''} · ${report.project?.client || ''}</div>
+    <div style="font-size:12px;opacity:0.5;margin-top:2px">Period: ${report.period_start} – ${report.period_end}</div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(totalProgress,100)}%"></div></div>
+  </div>
+  <div style="text-align:right">
+    <div class="score-num">${totalProgress.toFixed(2)}%</div>
+    <div style="font-size:11px;opacity:0.5">weighted progress</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Activities Progress</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Activity</th>
+        <th style="text-align:center">Weight</th>
+        <th style="text-align:center">Progress</th>
+        <th style="text-align:center">Contribution</th>
+        <th>Progress Bar</th>
+        <th style="text-align:center">Status</th>
+      </tr>
+    </thead>
+    <tbody>${actRows}</tbody>
+    <tr style="background:#1A1A2A;color:white">
+      <td style="padding:10px 12px;font-weight:700">TOTAL WEIGHTED PROGRESS</td>
+      <td style="padding:10px 12px;text-align:center">100%</td>
+      <td style="padding:10px 12px;text-align:center">—</td>
+      <td style="padding:10px 12px;text-align:center;font-weight:700;color:#D46A28">${totalProgress.toFixed(2)}%</td>
+      <td colspan="2"></td>
+    </tr>
+  </table>
+</div>
+
+${mainChartHtml}
+${miniChartsHtml}
+
+<div class="section">
+  <h2>Works & Notes</h2>
+  <div class="text-box">
+    <div class="text-card">
+      <h3 style="color:#065f46">✓ Works Completed</h3>
+      <p>${worksDone || '—'}</p>
+    </div>
+    <div class="text-card">
+      <h3 style="color:#0C447C">→ Works Planned</h3>
+      <p>${worksPlanned || '—'}</p>
+    </div>
+    <div class="text-card">
+      <h3 style="color:#7f1d1d">🚩 Red Flags</h3>
+      <p>${redFlags || '—'}</p>
+    </div>
+  </div>
+</div>
+
+${photosHtml}
+
+<div class="footer">
+  Square 7 · Part of M.Core · Progress Platform · Generated ${new Date().toLocaleDateString('en-GB')}
+</div>
+
+<script>window.onload = () => window.print()</script>
+</body>
+</html>`
+
+    win.document.write(html)
+    win.document.close()
+  }
+
   if (!report || report.error) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Report not found</div>
 
   const acts = (report.activities || []).sort((a: any, b: any) => (a.activity?.sort_order || 0) - (b.activity?.sort_order || 0))
@@ -448,10 +643,6 @@ export default function ReportPage() {
   const currentCumulated = currentIdx >= 0 ? cumulatedData[currentIdx] : totalProgress
   const prevCumulated = currentIdx > 0 ? cumulatedData[currentIdx - 1] : 0
   const weeklyProgress = parseFloat((currentCumulated - prevCumulated).toFixed(2))
-
-  const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
-  const lbl = { display: 'block' as any, fontSize: 11, color: '#6b7280', marginBottom: 3 }
-  const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 } as any)
 
   return (
     <div style={{ minHeight: '100vh', background: '#f5f5f3', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
@@ -472,7 +663,7 @@ export default function ReportPage() {
           <button onClick={() => setEditing(!editing)} style={btn('rgba(255,255,255,0.1)')}>✏️ Edit text</button>
           <button onClick={() => setEditingWeights(!editingWeights)} style={btn('rgba(255,255,255,0.1)')}>⚖️ Weights</button>
           <a href={`/api/reports/${id}/export-word`} style={{ ...btn('rgba(255,255,255,0.1)'), textDecoration: 'none' }}>📄 Word</a>
-          <a href={`/api/reports/${id}/export-pdf`} style={{ ...btn(BLUE), textDecoration: 'none' }}>📑 PDF</a>
+          <button onClick={exportPdfClientSide} style={btn(BLUE)}>📑 PDF</button>
           <button onClick={handleNewReport} style={btn(ORANGE)}>+ New Report</button>
           <button onClick={deleteReport} disabled={deleting} style={btn('#dc2626')}>🗑</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
@@ -539,7 +730,7 @@ export default function ReportPage() {
         <div style={{ background: HEADER_BG, borderRadius: 12, padding: '20px 28px', color: '#fff', marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{report.project?.name}</h1>
+              <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>{report.project?.name}</h1>
               <p style={{ color: 'rgba(255,255,255,0.65)', marginTop: 4, fontSize: 13 }}>{report.period_start} – {report.period_end}</p>
               {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
@@ -676,19 +867,25 @@ export default function ReportPage() {
             )}
           </div>
           {photos.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-              {photos.map((src, i) => (
-                <div key={i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
-                  {src.startsWith('data:image') ? (
-                    <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{src.replace('data:text/plain,', '')}</div>
-                  )}
-                  <button onClick={() => removePhoto(i)}
-                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 99, width: 22, height: 22, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                </div>
-              ))}
-            </div>
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+                {photos.map((src, i) => (
+                  <div key={i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
+                    {src.startsWith('data:image') ? (
+                      <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{src.replace('data:text/plain,', '')}</div>
+                    )}
+                    <button onClick={() => removePhoto(i)}
+                      style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 99, width: 22, height: 22, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 14 }}>
+                {photosJustSaved && <span style={{ fontSize: 12, color: '#065f46' }}>✓ Saved</span>}
+                <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
+              </div>
+            </>
           )}
         </div>
 
