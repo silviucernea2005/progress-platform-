@@ -7,6 +7,7 @@ const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
 const GRAY_CHART = '#2C2C2C'
+const HEADER_BG = '#1e3a5f'  // pleasant dark blue instead of black
 
 export default function ReportPage() {
   const { id } = useParams()
@@ -26,7 +27,6 @@ export default function ReportPage() {
   const [dragOver, setDragOver] = useState(false)
   const [editingWeights, setEditingWeights] = useState(false)
   const [weights, setWeights] = useState<Record<number, number>>({})
-  const dropRef = useRef<HTMLDivElement>(null)
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -123,23 +123,97 @@ export default function ReportPage() {
 
   const today = new Date().toISOString().split('T')[0]
 
-  // Photo drag & drop
+  function computeProgress(rep: any) {
+    const acts = rep.activities || []
+    return parseFloat(acts.reduce((s: number, a: any) => {
+      const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
+      return s + a.progress * w / 100
+    }, 0).toFixed(2))
+  }
+
+  const tenderTotal = daysBetween(tenderStart, tenderFinish)
+  const contractingTotal = daysBetween(contractingStart, contractingFinish)
+  const constructionTotal = daysBetween(constructionStart, constructionFinishEstimated)
+
+  // Estimated at contract finish & trend finish date
+  let estimatedAtContractFinish: number | null = null
+  let trendFinishDate: string | null = null
+
+  const cumulatedData = allReports.map(r => computeProgress(r))
+
+  if (cumulatedData.length >= 2) {
+    const lastProgress = cumulatedData[cumulatedData.length - 1]
+    const prevProgress = cumulatedData[cumulatedData.length - 2]
+    const weeklyGain = lastProgress - prevProgress
+    const lastDate = allReports[allReports.length - 1]?.period_end
+
+    if (weeklyGain > 0 && lastDate) {
+      const weeksTo100 = (100 - lastProgress) / weeklyGain
+      const finishMs = new Date(lastDate).getTime() + weeksTo100 * 7 * 86400000
+      trendFinishDate = new Date(finishMs).toISOString().split('T')[0]
+    }
+
+    if (contractFinish) {
+      const weeksToFinish = daysBetween(lastDate, contractFinish) / 7
+      const weeklyGainSafe = Math.max(weeklyGain, 0)
+      estimatedAtContractFinish = Math.min(100, cumulatedData[cumulatedData.length - 1] + weeklyGainSafe * weeksToFinish)
+    }
+  }
+
+  function getTrendColor() {
+    if (estimatedAtContractFinish === null) return '#aaaaaa'
+    if (estimatedAtContractFinish >= 99) return '#86efac'
+    if (estimatedAtContractFinish < 90) return '#fca5a5'
+    return '#aaaaaa'
+  }
+
+  // Photo drag & drop — supports images, PDF, Excel, Word (extract first image if PDF)
   async function handlePhotoDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    const files = Array.from(e.dataTransfer.files)
     if (!files.length) return
     setUploadingPhoto(true)
     const newPhotos: string[] = []
     for (const file of files) {
-      const reader = new FileReader()
-      await new Promise<void>(res => {
-        reader.onload = () => {
-          newPhotos.push(reader.result as string)
-          res()
-        }
-        reader.readAsDataURL(file)
-      })
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader()
+        await new Promise<void>(res => {
+          reader.onload = () => { newPhotos.push(reader.result as string); res() }
+          reader.readAsDataURL(file)
+        })
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        // Render first page of PDF using PDF.js
+        const reader = new FileReader()
+        await new Promise<void>(res => {
+          reader.onload = async () => {
+            try {
+              const pdfjsLib = (window as any).pdfjsLib
+              if (pdfjsLib) {
+                const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise
+                const numPages = pdf.numPages
+                for (let p = 1; p <= Math.min(numPages, 10); p++) {
+                  const page = await pdf.getPage(p)
+                  const viewport = page.getViewport({ scale: 1.5 })
+                  const canvas = document.createElement('canvas')
+                  canvas.width = viewport.width
+                  canvas.height = viewport.height
+                  await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise
+                  newPhotos.push(canvas.toDataURL('image/jpeg', 0.85))
+                }
+              }
+            } catch {}
+            res()
+          }
+          reader.readAsArrayBuffer(file)
+        })
+      }
+      // Excel/Word: just show file icon as placeholder
+      else if (file.name.match(/\.(xlsx|xls|docx|doc)$/i)) {
+        const ext = file.name.split('.').pop()?.toLowerCase()
+        const icon = ext?.includes('xl') ? '📊' : '📄'
+        newPhotos.push(`data:text/plain,${icon} ${file.name}`)
+      }
     }
     const updated = [...photos, ...newPhotos]
     setPhotos(updated)
@@ -153,38 +227,17 @@ export default function ReportPage() {
     localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
   }
 
-  const tenderTotal = daysBetween(tenderStart, tenderFinish)
-  const contractingTotal = daysBetween(contractingStart, contractingFinish)
-  const constructionTotal = daysBetween(constructionStart, constructionFinishEstimated)
-
-  // Compute weighted progress using custom weights
-  function computeProgress(rep: any) {
-    const acts = rep.activities || []
-    return parseFloat(acts.reduce((s: number, a: any) => {
-      const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
-      return s + a.progress * w / 100
-    }, 0).toFixed(2))
-  }
-
-  // Trend color
-  function getTrendColor() {
-    if (!allReports.length || !constructionFinishEstimated || !contractFinish) return '#888780'
-    if (estimatedAtContractFinish === null) return '#888780'
-    if (estimatedAtContractFinish >= 100) return '#86efac' // light green
-    if (estimatedAtContractFinish < 95) return '#fca5a5'  // light red
-    return '#888780' // gray = on time
-  }
-
-  // Estimated at contract finish
-  let estimatedAtContractFinish: number | null = null
-  if (allReports.length >= 2 && contractFinish) {
-    const cumulatedData = allReports.map(r => computeProgress(r))
-    const lastProgress = cumulatedData[cumulatedData.length - 1]
-    const prevProgress = cumulatedData[cumulatedData.length - 2]
-    const weeklyGain = lastProgress - prevProgress
-    const lastDate = allReports[allReports.length - 1].period_end
-    const weeksToFinish = daysBetween(lastDate, contractFinish) / 7
-    estimatedAtContractFinish = Math.min(100, lastProgress + Math.max(weeklyGain, 0) * weeksToFinish)
+  // New report with preserved progress
+  function handleNewReport() {
+    if (!report?.project_id) return
+    const acts = (report.activities || []).map((a: any) => ({
+      activity_id: a.activity_id,
+      progress: a.progress,
+      name: a.activity?.name,
+      weight: getWeight(a.activity_id, a.activity?.default_weight || 0)
+    }))
+    localStorage.setItem(`prefill_report_${report.project_id}`, JSON.stringify({ activities: acts, project_id: report.project_id, project_name: report.project?.name }))
+    router.push(`/reports/new?project=${report.project_id}&prefill=1`)
   }
 
   useEffect(() => {
@@ -196,33 +249,36 @@ export default function ReportPage() {
       chartInstances.current = []
 
       const labels = allReports.map(r => r.period_end)
-      const cumulatedData = allReports.map(r => computeProgress(r))
-      const actualData = cumulatedData.map((v, i) => i === 0 ? v : parseFloat((v - cumulatedData[i-1]).toFixed(2)))
+      const cumData = allReports.map(r => computeProgress(r))
+      const actualData = cumData.map((v, i) => i === 0 ? v : parseFloat((v - cumData[i-1]).toFixed(2)))
 
       const allLabels = [...labels]
-      const trendFull: (number|null)[] = [...Array(cumulatedData.length - 1).fill(null)]
+      const trendFull: (number|null)[] = [...Array(cumData.length - 1).fill(null)]
       const trendColor = getTrendColor()
 
-      if (cumulatedData.length >= 2 && constructionFinishEstimated) {
-        const lastProgress = cumulatedData[cumulatedData.length - 1]
-        const prevProgress = cumulatedData[cumulatedData.length - 2]
-        const weeklyGain = lastProgress - prevProgress
+      if (cumData.length >= 2 && constructionFinishEstimated) {
+        const lastProgress = cumData[cumData.length - 1]
+        const prevProgress = cumData[cumData.length - 2]
+        const weeklyGain = Math.max(lastProgress - prevProgress, 0)
         trendFull.push(lastProgress)
         let current = new Date(labels[labels.length - 1])
         let currentProg = lastProgress
         const finishDate = new Date(constructionFinishEstimated)
-        while (current < finishDate) {
+        while (current < finishDate && currentProg < 100) {
           current = new Date(current.getTime() + 7 * 86400000)
-          currentProg = Math.min(100, currentProg + Math.max(weeklyGain, 0))
+          currentProg = Math.min(100, currentProg + weeklyGain)
           allLabels.push(current.toISOString().split('T')[0])
           trendFull.push(parseFloat(currentProg.toFixed(2)))
         }
       } else {
-        trendFull.push(cumulatedData[cumulatedData.length - 1] ?? null)
+        trendFull.push(cumData[cumData.length - 1] ?? null)
       }
 
-      const cumulatedFull = [...cumulatedData, ...Array(allLabels.length - labels.length).fill(null)]
+      const cumulatedFull = [...cumData, ...Array(allLabels.length - labels.length).fill(null)]
       const actualFull = [...actualData, ...Array(allLabels.length - labels.length).fill(null)]
+
+      // Trend finish annotation line index
+      const trendFinishIdx = trendFinishDate ? allLabels.indexOf(trendFinishDate) : -1
 
       if (mainChartRef.current) {
         chartInstances.current.push(new Chart(mainChartRef.current, {
@@ -232,7 +288,7 @@ export default function ReportPage() {
             datasets: [
               { label: 'Cumulated Progress', data: cumulatedFull, borderColor: ORANGE, backgroundColor: 'rgba(212,106,40,0.12)', borderWidth: 2.5, pointBackgroundColor: ORANGE, pointRadius: 4, tension: 0.35, fill: true, yAxisID: 'y' },
               { label: 'Actual Progress', data: actualFull, borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.05)', borderWidth: 1.5, pointBackgroundColor: BLUE, pointRadius: 3, tension: 0.35, fill: false, yAxisID: 'y' },
-              { label: 'Trend', data: trendFull, borderColor: trendColor, borderWidth: 2, borderDash: [6,4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' }
+              { label: 'Trend', data: trendFull, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' }
             ]
           },
           options: {
@@ -240,7 +296,26 @@ export default function ReportPage() {
             interaction: { mode: 'index', intersect: false },
             plugins: {
               legend: { display: true, position: 'top', labels: { color: '#e5e7eb', font: { size: 11 }, boxWidth: 18 } },
-              tooltip: { callbacks: { label: (ctx: any) => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y}%` : '' } }
+              tooltip: { callbacks: { label: (ctx: any) => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y}%` : '' } },
+              annotation: trendFinishIdx >= 0 ? {
+                annotations: {
+                  trendLine: {
+                    type: 'line',
+                    xMin: trendFinishIdx,
+                    xMax: trendFinishIdx,
+                    borderColor: 'rgba(200,200,200,0.5)',
+                    borderWidth: 1,
+                    borderDash: [4, 4],
+                    label: {
+                      display: true,
+                      content: `Finish: ${trendFinishDate}`,
+                      position: 'start',
+                      color: '#ccc',
+                      font: { size: 10 }
+                    }
+                  }
+                }
+              } : {}
             },
             scales: {
               y: { min: 0, max: 100, position: 'left', ticks: { callback: (v: any) => v + '%', color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.06)' } },
@@ -251,16 +326,32 @@ export default function ReportPage() {
         }))
       }
 
-      function miniBar(ref: any, labels: string[], values: number[], title: string) {
+      // Mini bar charts with data labels
+      function miniBar(ref: any, barLabels: string[], values: number[], title: string) {
         if (!ref.current) return
         chartInstances.current.push(new Chart(ref.current, {
           type: 'bar',
-          data: { labels, datasets: [{ data: values, backgroundColor: [BLUE_DARK, BLUE, BLUE, BLUE], borderRadius: 4 }] },
+          data: {
+            labels: barLabels,
+            datasets: [{
+              data: values,
+              backgroundColor: [BLUE_DARK, BLUE, BLUE, BLUE],
+              borderRadius: 4,
+            }]
+          },
           options: {
             responsive: true,
             plugins: {
               legend: { display: false },
-              title: { display: true, text: title, font: { size: 12, weight: 'bold' }, color: MCORE_DARK }
+              title: { display: true, text: title, font: { size: 12, weight: 'bold' }, color: MCORE_DARK },
+              datalabels: {
+                display: true,
+                anchor: 'end',
+                align: 'top',
+                color: '#374151',
+                font: { size: 10, weight: 'bold' },
+                formatter: (v: number) => v > 0 ? `${v}d` : ''
+              }
             },
             scales: {
               y: { beginAtZero: true, ticks: { font: { size: 9 } } },
@@ -270,78 +361,107 @@ export default function ReportPage() {
         }))
       }
 
-      miniBar(tenderChartRef, ['Start','Offers Received','Offers Review','Finish'], [0, daysBetween(tenderStart,tenderOffersReceived), daysBetween(tenderOffersReceived,tenderOffersReview), daysBetween(tenderOffersReview,tenderFinish)], 'Tender Days')
-      miniBar(contractingChartRef, ['Start','Review Legal','Finish'], [0, daysBetween(contractingStart,contractingReviewLegal), daysBetween(contractingReviewLegal,contractingFinish)], 'Contracting Days')
-      miniBar(constructionChartRef, ['Proceed Notice','Start','Finish Est.'], [daysBetween(constructionProceedNotice,constructionStart), daysBetween(constructionStart,today), constructionTotal], 'Construction Days')
+      miniBar(tenderChartRef, ['Start', 'Offers Rec.', 'Offers Rev.', 'Finish'],
+        [0, daysBetween(tenderStart, tenderOffersReceived), daysBetween(tenderOffersReceived, tenderOffersReview), daysBetween(tenderOffersReview, tenderFinish)],
+        'Tender Days')
+      miniBar(contractingChartRef, ['Start', 'Review Legal', 'Finish'],
+        [0, daysBetween(contractingStart, contractingReviewLegal), daysBetween(contractingReviewLegal, contractingFinish)],
+        'Contracting Days')
+      miniBar(constructionChartRef, ['Proceed Notice', 'Start', 'Finish Est.'],
+        [daysBetween(constructionProceedNotice, constructionStart), daysBetween(constructionStart, today), constructionTotal],
+        'Construction Days')
     }
 
-    if ((window as any).Chart) loadChart()
-    else {
+    // Load Chart.js + datalabels plugin
+    const loadChartJS = () => {
+      if ((window as any).Chart) { loadChart(); return }
       const s = document.createElement('script')
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'
-      s.onload = loadChart
+      s.onload = () => {
+        const dl = document.createElement('script')
+        dl.src = 'https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js'
+        dl.onload = () => {
+          const Chart = (window as any).Chart
+          Chart.register((window as any).ChartDataLabels)
+          // Load PDF.js for PDF photo extraction
+          const pdfScript = document.createElement('script')
+          pdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+          pdfScript.onload = () => {
+            (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+          }
+          document.head.appendChild(pdfScript)
+          loadChart()
+        }
+        document.head.appendChild(dl)
+      }
       document.head.appendChild(s)
     }
+    loadChartJS()
   }, [allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart])
 
-  if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>Loading...</div>
-  if (!report || report.error) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh' }}>Report not found</div>
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Loading...</div>
+  if (!report || report.error) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Report not found</div>
 
-  const acts = (report.activities || []).sort((a: any, b: any) => (a.activity?.sort_order||0) - (b.activity?.sort_order||0))
-  const totalProgress = acts.reduce((s: number, a: any) => s + a.progress * getWeight(a.activity_id, a.activity?.default_weight||0) / 100, 0)
+  const acts = (report.activities || []).sort((a: any, b: any) => (a.activity?.sort_order || 0) - (b.activity?.sort_order || 0))
+  const totalProgress = acts.reduce((s: number, a: any) => s + a.progress * getWeight(a.activity_id, a.activity?.default_weight || 0) / 100, 0)
   const trendColor = getTrendColor()
 
-  const inp = { border:'1px solid #d1d5db', borderRadius:6, padding:'5px 8px', fontSize:12, width:'100%', boxSizing:'border-box' as any }
-  const lbl = { display:'block' as any, fontSize:11, color:'#6b7280', marginBottom:3 }
-  const btn = (bg: string, color='#fff') => ({ background:bg, color, border:'none', borderRadius:6, padding:'6px 13px', fontSize:12, cursor:'pointer', fontWeight:500, display:'inline-flex', alignItems:'center', gap:5 } as any)
+  // Weekly progress (difference from previous report)
+  const currentIdx = allReports.findIndex(r => r.id === id)
+  const currentCumulated = currentIdx >= 0 ? cumulatedData[currentIdx] : totalProgress
+  const prevCumulated = currentIdx > 0 ? cumulatedData[currentIdx - 1] : 0
+  const weeklyProgress = parseFloat((currentCumulated - prevCumulated).toFixed(2))
+
+  const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
+  const lbl = { display: 'block' as any, fontSize: 11, color: '#6b7280', marginBottom: 3 }
+  const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 } as any)
 
   return (
-    <div style={{ minHeight:'100vh', background:'#f5f5f3', fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
-      {/* HEADER */}
-      <header style={{ background: MCORE_DARK, color:'#fff', padding:'10px 24px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-          {/* Square 7 logo text */}
-          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <div style={{ background: BLUE, borderRadius:8, padding:'4px 10px', fontWeight:900, fontSize:16, letterSpacing:1, color:'#fff' }}>S7</div>
-            <div>
-              <div style={{ fontWeight:700, fontSize:13, letterSpacing:0.5, color:'#fff' }}>Square 7</div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', letterSpacing:1 }}>PART OF M.CORE</div>
-            </div>
+    <div style={{ minHeight: '100vh', background: '#f5f5f3', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
+
+      {/* STICKY HEADER */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>Square 7</div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', letterSpacing: 1 }}>PART OF M.CORE</div>
           </div>
-          <div style={{ width:1, height:28, background:'rgba(255,255,255,0.15)', margin:'0 8px' }} />
-          <span style={{ fontWeight:500, fontSize:13, color:'rgba(255,255,255,0.8)' }}>Progress Platform</span>
+          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
+          <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Progress Platform</span>
         </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
           <button onClick={() => setEditing(!editing)} style={btn('rgba(255,255,255,0.1)')}>✏️ Edit text</button>
           <button onClick={() => setEditingWeights(!editingWeights)} style={btn('rgba(255,255,255,0.1)')}>⚖️ Weights</button>
-          <a href={`/api/reports/${id}/export-word`} style={{ ...btn('rgba(255,255,255,0.1)'), textDecoration:'none' }}>📄 Word</a>
-          <a href={`/api/reports/${id}/export-pdf`} style={{ ...btn(BLUE), textDecoration:'none' }}>📑 PDF</a>
-          <button onClick={deleteReport} disabled={deleting} style={btn('#dc2626')}>🗑 Delete</button>
-          <button onClick={() => router.push('/dashboard')} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:12 }}>← Dashboard</button>
+          <a href={`/api/reports/${id}/export-word`} style={{ ...btn('rgba(255,255,255,0.1)'), textDecoration: 'none' }}>📄 Word</a>
+          <a href={`/api/reports/${id}/export-pdf`} style={{ ...btn(BLUE), textDecoration: 'none' }}>📑 PDF</a>
+          <button onClick={handleNewReport} style={btn(ORANGE)}>+ New Report</button>
+          <button onClick={deleteReport} disabled={deleting} style={btn('#dc2626')}>🗑</button>
+          <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
         </div>
       </header>
 
-      <main style={{ maxWidth:1100, margin:'0 auto', padding:'20px 24px' }}>
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px' }}>
 
         {/* PROJECT DATES — collapsible */}
         {showDates && (
-          <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20, marginBottom:20 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-              <h2 style={{ fontSize:14, fontWeight:700, margin:0, color: MCORE_DARK }}>Project Dates</h2>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Project Dates</h2>
               <button onClick={saveDates} style={btn(BLUE)}>Save & Hide</button>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {[
-                { title:'TENDER', fields:[['Start',tenderStart,setTenderStart],['Offers Received',tenderOffersReceived,setTenderOffersReceived],['Offers Review',tenderOffersReview,setTenderOffersReview],['Finish',tenderFinish,setTenderFinish]] },
-                { title:'CONTRACTING', fields:[['Start',contractingStart,setContractingStart],['Review Legal',contractingReviewLegal,setContractingReviewLegal],['Finish',contractingFinish,setContractingFinish]] },
-                { title:'CONSTRUCTION', fields:[['Proceed Notice',constructionProceedNotice,setConstructionProceedNotice],['Start',constructionStart,setConstructionStart],['Finish Estimated',constructionFinishEstimated,setConstructionFinishEstimated]] },
-                { title:'CONTRACT', fields:[['Contract Start',contractStart,setContractStart],['Contract Finish',contractFinish,setContractFinish]] },
+                { title: 'TENDER', fields: [['Start', tenderStart, setTenderStart], ['Offers Received', tenderOffersReceived, setTenderOffersReceived], ['Offers Review', tenderOffersReview, setTenderOffersReview], ['Finish', tenderFinish, setTenderFinish]] },
+                { title: 'CONTRACTING', fields: [['Start', contractingStart, setContractingStart], ['Review Legal', contractingReviewLegal, setContractingReviewLegal], ['Finish', contractingFinish, setContractingFinish]] },
+                { title: 'CONSTRUCTION', fields: [['Proceed Notice', constructionProceedNotice, setConstructionProceedNotice], ['Start', constructionStart, setConstructionStart], ['Finish Estimated', constructionFinishEstimated, setConstructionFinishEstimated]] },
+                { title: 'CONTRACT', fields: [['Contract Start', contractStart, setContractStart], ['Contract Finish', contractFinish, setContractFinish]] },
               ].map(section => (
-                <div key={section.title} style={{ background:'#f9fafb', borderRadius:8, padding:12 }}>
-                  <div style={{ fontWeight:700, fontSize:11, color: BLUE_DARK, marginBottom:10, letterSpacing:0.5 }}>{section.title}</div>
+                <div key={section.title} style={{ background: '#f9fafb', borderRadius: 8, padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 11, color: BLUE_DARK, marginBottom: 10, letterSpacing: 0.5 }}>{section.title}</div>
                   {section.fields.map(([label, value, setter]: any) => (
-                    <div key={label} style={{ marginBottom:8 }}>
+                    <div key={label} style={{ marginBottom: 8 }}>
                       <label style={lbl}>{label}</label>
                       <input type="date" value={value} onChange={e => setter(e.target.value)} style={inp} />
                     </div>
@@ -354,164 +474,181 @@ export default function ReportPage() {
 
         {/* WEIGHTS EDITOR */}
         {editingWeights && (
-          <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20, marginBottom:20 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-              <h2 style={{ fontSize:14, fontWeight:700, margin:0, color: MCORE_DARK }}>Edit Activity Weights for this Project</h2>
-              <div style={{ display:'flex', gap:8 }}>
-                <span style={{ fontSize:12, color: acts.reduce((s: number, a: any) => s + (weights[a.activity_id]??a.activity?.default_weight??0), 0) === 100 ? '#065f46' : '#dc2626', fontWeight:600, padding:'4px 10px', background: acts.reduce((s: number, a: any) => s + (weights[a.activity_id]??a.activity?.default_weight??0), 0) === 100 ? '#ecfdf5' : '#fef2f2', borderRadius:6 }}>
-                  Total: {acts.reduce((s: number, a: any) => s + (weights[a.activity_id]??a.activity?.default_weight??0), 0)}%
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Edit Activity Weights</h2>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#ecfdf5' : '#fef2f2', color: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#065f46' : '#dc2626' }}>
+                  Total: {acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0)}%
                 </span>
                 <button onClick={saveWeights} style={btn(BLUE)}>Save weights</button>
               </div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
               {acts.map((a: any) => (
-                <div key={a.activity_id} style={{ background:'#f9fafb', borderRadius:8, padding:10 }}>
-                  <div style={{ fontSize:12, fontWeight:500, color: MCORE_DARK, marginBottom:6 }}>{a.activity?.name}</div>
-                  <input type="number" min={0} max={100} value={weights[a.activity_id]??a.activity?.default_weight??0}
+                <div key={a.activity_id} style={{ background: '#f9fafb', borderRadius: 8, padding: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{a.activity?.name}</div>
+                  <input type="number" min={0} max={100} value={weights[a.activity_id] ?? a.activity?.default_weight ?? 0}
                     onChange={e => setWeights(prev => ({ ...prev, [a.activity_id]: Number(e.target.value) }))}
-                    style={{ ...inp, textAlign:'center', fontWeight:600, fontSize:14 }} />
-                  <div style={{ fontSize:10, color:'#9ca3af', marginTop:4, textAlign:'center' }}>Default: {a.activity?.default_weight}%</div>
+                    style={{ ...inp, textAlign: 'center', fontWeight: 600, fontSize: 14 }} />
+                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'center' }}>Default: {a.activity?.default_weight}%</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* REPORT HEADER */}
-        <div style={{ background: MCORE_DARK, borderRadius:12, padding:'20px 28px', color:'#fff', marginBottom:20 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+        {/* REPORT HEADER — pleasant blue instead of black */}
+        <div style={{ background: HEADER_BG, borderRadius: 12, padding: '20px 28px', color: '#fff', marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h1 style={{ fontSize:20, fontWeight:700, margin:0 }}>{report.project?.name}</h1>
-              <p style={{ color:'rgba(255,255,255,0.6)', marginTop:4, fontSize:13 }}>{report.period_start} – {report.period_end}</p>
-              {contractFinish && <p style={{ color:'rgba(255,255,255,0.5)', fontSize:12, marginTop:2 }}>
+              <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{report.project?.name}</h1>
+              <p style={{ color: 'rgba(255,255,255,0.65)', marginTop: 4, fontSize: 13 }}>{report.period_start} – {report.period_end}</p>
+              {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
               </p>}
               {estimatedAtContractFinish !== null && (
-                <div style={{ marginTop:8, display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,0.1)', borderRadius:8, padding:'5px 12px' }}>
-                  <span style={{ fontSize:12, color:'rgba(255,255,255,0.7)' }}>Estimated at contract finish:</span>
-                  <span style={{ fontSize:18, fontWeight:700, color: trendColor }}>{estimatedAtContractFinish.toFixed(1)}%</span>
+                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Estimated at contract finish:</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: trendColor }}>{estimatedAtContractFinish.toFixed(1)}%</span>
+                </div>
+              )}
+              {trendFinishDate && (
+                <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                  At current pace, project finishes: <strong style={{ color: trendColor }}>{trendFinishDate}</strong>
                 </div>
               )}
             </div>
-            <div style={{ textAlign:'right' }}>
-              <div style={{ fontSize:40, fontWeight:700 }}>{totalProgress.toFixed(2)}%</div>
-              <div style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>weighted progress</div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 40, fontWeight: 700 }}>{totalProgress.toFixed(2)}%</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>weighted progress</div>
+              {weeklyProgress > 0 && <div style={{ fontSize: 13, color: ORANGE, fontWeight: 600, marginTop: 4 }}>+{weeklyProgress}% this week</div>}
             </div>
           </div>
-          <div style={{ marginTop:14, height:6, background:'rgba(255,255,255,0.15)', borderRadius:99, overflow:'hidden' }}>
-            <div style={{ height:'100%', background: ORANGE, borderRadius:99, width:`${Math.min(totalProgress,100)}%`, transition:'width 0.5s' }} />
+          <div style={{ marginTop: 14, height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(totalProgress, 100)}%`, transition: 'width 0.5s' }} />
           </div>
         </div>
 
-        {/* 3 MINI CHARTS — always visible */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16, marginBottom:20 }}>
+        {/* 3 MINI CHARTS */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
             { ref: tenderChartRef, total: tenderTotal, label: 'Tender' },
             { ref: contractingChartRef, total: contractingTotal, label: 'Contracting' },
             { ref: constructionChartRef, total: constructionTotal, label: 'Construction' },
           ].map(item => (
-            <div key={item.label} style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:16 }}>
-              <canvas ref={item.ref} height={150} />
-              {item.total > 0 && <div style={{ textAlign:'center', fontSize:11, color:'#6b7280', marginTop:4 }}>Total: {item.total} days</div>}
+            <div key={item.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+              <canvas ref={item.ref} height={160} />
+              {item.total > 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#6b7280', marginTop: 4 }}>Total: {item.total} days</div>}
             </div>
           ))}
         </div>
 
         {/* MAIN CHART — dark bg */}
         {allReports.length >= 1 && (
-          <div style={{ background: GRAY_CHART, borderRadius:12, padding:20, marginBottom:20 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-              <h2 style={{ fontSize:14, fontWeight:700, margin:0, color:'#e5e7eb' }}>Works Progress · {report.project?.name}</h2>
-              {estimatedAtContractFinish !== null && (
-                <div style={{ fontSize:12, color: trendColor, fontWeight:700, background:'rgba(255,255,255,0.1)', padding:'4px 12px', borderRadius:6 }}>
-                  Trend: {estimatedAtContractFinish.toFixed(1)}% at finish
-                </div>
-              )}
+          <div style={{ background: GRAY_CHART, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#e5e7eb' }}>Works Progress · {report.project?.name}</h2>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {trendFinishDate && (
+                  <div style={{ fontSize: 11, color: trendColor, fontWeight: 600, background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
+                    📅 Trend finish: {trendFinishDate}
+                  </div>
+                )}
+                {estimatedAtContractFinish !== null && (
+                  <div style={{ fontSize: 11, color: trendColor, fontWeight: 700, background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
+                    At contract finish: {estimatedAtContractFinish.toFixed(1)}%
+                  </div>
+                )}
+              </div>
             </div>
             <canvas ref={mainChartRef} height={220} />
           </div>
         )}
 
         {/* ACTIVITIES */}
-        <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20, marginBottom:20 }}>
-          <h2 style={{ fontSize:14, fontWeight:700, marginBottom:14, color: MCORE_DARK }}>Activities Progress</h2>
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Activities Progress</h2>
           {acts.map((a: any) => {
-            const w = getWeight(a.activity_id, a.activity?.default_weight||0)
+            const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
             return (
-              <div key={a.activity_id} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:10 }}>
-                <span style={{ width:190, fontSize:13, color: MCORE_DARK }}>{a.activity?.name}</span>
-                <span style={{ fontSize:11, color:'#9ca3af', width:28 }}>{w}%</span>
-                <div style={{ flex:1, height:7, background:'#f3f4f6', borderRadius:99, overflow:'hidden' }}>
-                  <div style={{ height:'100%', borderRadius:99, width:`${a.progress}%`, background: a.progress===100? MCORE_DARK:a.progress>0? ORANGE:'#e5e7eb', transition:'width 0.3s' }} />
+              <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                <span style={{ width: 190, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
+                <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
+                <div style={{ flex: 1, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 99, width: `${a.progress}%`, background: a.progress === 100 ? MCORE_DARK : a.progress > 0 ? ORANGE : '#e5e7eb', transition: 'width 0.3s' }} />
                 </div>
-                <span style={{ width:38, textAlign:'right', fontSize:13, fontWeight:600, color: MCORE_DARK }}>{a.progress}%</span>
-                <span style={{ fontSize:11, padding:'2px 8px', borderRadius:99, minWidth:72, textAlign:'center',
-                  background:a.progress===0?'#f3f4f6':a.progress<100?'#fef3c7':'#ecfdf5',
-                  color:a.progress===0?'#6b7280':a.progress<100?'#92400e':'#065f46' }}>
-                  {a.progress===0?'Not started':a.progress<100?'In progress':'Completed'}
+                <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: a.progress === 0 ? '#f3f4f6' : a.progress < 100 ? '#fef3c7' : '#ecfdf5', color: a.progress === 0 ? '#6b7280' : a.progress < 100 ? '#92400e' : '#065f46' }}>
+                  {a.progress === 0 ? 'Not started' : a.progress < 100 ? 'In progress' : 'Completed'}
                 </span>
               </div>
             )
           })}
+          {/* Weekly progress summary row */}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>Weekly Progress (this period)</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: ORANGE }}>+{weeklyProgress}%</span>
+          </div>
         </div>
 
         {/* TEXT SECTIONS */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:16, marginBottom:20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
-            { label:'✓ Works completed', value: worksDone, setter: setWorksDone, color:'#065f46', key:'done' },
-            { label:'→ Works planned', value: worksPlanned, setter: setWorksPlanned, color: BLUE_DARK, key:'planned' },
-            { label:'🚩 Red Flags', value: redFlags, setter: setRedFlags, color:'#7f1d1d', key:'flags' },
+            { label: '✓ Works completed', value: worksDone, setter: setWorksDone, color: '#065f46', key: 'done' },
+            { label: '→ Works planned', value: worksPlanned, setter: setWorksPlanned, color: BLUE_DARK, key: 'planned' },
+            { label: '🚩 Red Flags', value: redFlags, setter: setRedFlags, color: '#7f1d1d', key: 'flags' },
           ].map(section => (
-            <div key={section.key} style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:18 }}>
-              <h3 style={{ fontSize:13, fontWeight:600, color: section.color, marginBottom:10 }}>{section.label}</h3>
+            <div key={section.key} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: section.color, marginBottom: 10 }}>{section.label}</h3>
               {editing ? (
                 <textarea value={section.value} onChange={e => section.setter(e.target.value)} rows={5}
-                  style={{ width:'100%', border:'1px solid #d1d5db', borderRadius:8, padding:'8px 10px', fontSize:13, resize:'vertical', boxSizing:'border-box', fontFamily:'inherit' }} />
+                  style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 8, padding: '8px 10px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               ) : (
-                <div style={{ fontSize:13, color:'#374151', whiteSpace:'pre-line', minHeight:50 }}>{section.value || '—'}</div>
+                <div style={{ fontSize: 13, color: '#374151', whiteSpace: 'pre-line', minHeight: 50 }}>{section.value || '—'}</div>
               )}
             </div>
           ))}
         </div>
 
         {editing && (
-          <div style={{ display:'flex', justifyContent:'flex-end', gap:10, marginBottom:20 }}>
-            <button onClick={() => setEditing(false)} style={{ padding:'8px 18px', border:'1px solid #d1d5db', borderRadius:8, background:'#fff', fontSize:13, cursor:'pointer' }}>Cancel</button>
-            <button onClick={saveText} disabled={saving} style={{ ...btn(BLUE), padding:'8px 20px', fontSize:13 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 20 }}>
+            <button onClick={() => setEditing(false)} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={saveText} disabled={saving} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
               {saving ? 'Saving...' : 'Save text'}
             </button>
           </div>
         )}
 
-        {/* PHOTOS */}
-        <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e5e7eb', padding:20, marginBottom:20 }}>
-          <h2 style={{ fontSize:14, fontWeight:700, marginBottom:14, color: MCORE_DARK }}>Site Photos</h2>
+        {/* PHOTOS / ATTACHMENTS */}
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Site Photos & Attachments</h2>
           <div
-            ref={dropRef}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handlePhotoDrop}
-            style={{ border:`2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius:10, padding:28, textAlign:'center',
-              background: dragOver ? '#eff6ff' : '#f9fafb', transition:'all 0.2s', marginBottom:14, cursor:'pointer' }}
-          >
+            style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius: 10, padding: 24, textAlign: 'center', background: dragOver ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s', marginBottom: 14, cursor: 'pointer' }}>
             {uploadingPhoto ? (
-              <div style={{ color: BLUE, fontSize:13 }}>Uploading...</div>
+              <div style={{ color: BLUE, fontSize: 13 }}>Processing files...</div>
             ) : (
               <>
-                <div style={{ fontSize:28, marginBottom:6 }}>📸</div>
-                <div style={{ fontSize:13, color:'#6b7280' }}>Drag & drop photos here</div>
-                <div style={{ fontSize:11, color:'#9ca3af', marginTop:4 }}>JPG, PNG supported</div>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages extracted automatically</div>
               </>
             )}
           </div>
           {photos.length > 0 && (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
               {photos.map((src, i) => (
-                <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', aspectRatio:'4/3' }}>
-                  <img src={src} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                <div key={i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
+                  {src.startsWith('data:image') ? (
+                    <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{src.replace('data:text/plain,', '')}</div>
+                  )}
                   <button onClick={() => removePhoto(i)}
-                    style={{ position:'absolute', top:4, right:4, background:'rgba(0,0,0,0.6)', color:'#fff', border:'none', borderRadius:99, width:22, height:22, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 99, width: 22, height: 22, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                 </div>
               ))}
             </div>
