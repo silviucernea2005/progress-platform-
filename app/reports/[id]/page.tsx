@@ -167,7 +167,27 @@ export default function ReportPage() {
     return '#aaaaaa'
   }
 
-  // Photo drag & drop — supports images, PDF, Excel, Word (extract first image if PDF)
+  // Extract embedded images from Office Open XML files (xlsx/docx are ZIP archives —
+  // images live in xl/media/ for Excel and word/media/ for Word)
+  async function extractOfficeImages(file: File): Promise<string[]> {
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(file)
+    const mediaPrefix = /\.xlsx$/i.test(file.name) ? 'xl/media/' : 'word/media/'
+    const mediaEntries = Object.keys(zip.files)
+      .filter(name => name.startsWith(mediaPrefix) && !zip.files[name].dir)
+      .filter(name => /\.(png|jpe?g|gif|bmp)$/i.test(name))
+      .sort()
+    const images: string[] = []
+    for (const name of mediaEntries) {
+      const ext = name.split('.').pop()!.toLowerCase()
+      const mime = ext === 'jpg' ? 'jpeg' : ext
+      const base64 = await zip.files[name].async('base64')
+      images.push(`data:image/${mime};base64,${base64}`)
+    }
+    return images
+  }
+
+  // Photo drag & drop — supports images, PDF, Excel, Word (extract embedded images/pages automatically)
   async function handlePhotoDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
@@ -208,11 +228,28 @@ export default function ReportPage() {
           reader.readAsArrayBuffer(file)
         })
       }
-      // Excel/Word: just show file icon as placeholder
-      else if (file.name.match(/\.(xlsx|xls|docx|doc)$/i)) {
+      // Excel/Word (xlsx/docx): extract embedded images automatically
+      else if (file.name.match(/\.(xlsx|docx)$/i)) {
+        try {
+          const images = await extractOfficeImages(file)
+          if (images.length) {
+            newPhotos.push(...images)
+          } else {
+            const ext = file.name.split('.').pop()?.toLowerCase()
+            const icon = ext === 'xlsx' ? '📊' : '📄'
+            newPhotos.push(`data:text/plain,${icon} ${file.name} (no images found inside)`)
+          }
+        } catch {
+          const ext = file.name.split('.').pop()?.toLowerCase()
+          const icon = ext === 'xlsx' ? '📊' : '📄'
+          newPhotos.push(`data:text/plain,${icon} ${file.name}`)
+        }
+      }
+      // Old binary .xls / .doc — not a ZIP, images can't be extracted this way
+      else if (file.name.match(/\.(xls|doc)$/i)) {
         const ext = file.name.split('.').pop()?.toLowerCase()
         const icon = ext?.includes('xl') ? '📊' : '📄'
-        newPhotos.push(`data:text/plain,${icon} ${file.name}`)
+        newPhotos.push(`data:text/plain,${icon} ${file.name} (old format — save as .xlsx/.docx to extract images)`)
       }
     }
     const updated = [...photos, ...newPhotos]
@@ -634,7 +671,7 @@ export default function ReportPage() {
               <>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages extracted automatically</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
               </>
             )}
           </div>
