@@ -56,6 +56,7 @@ export default function ReportPage() {
       setRedFlags(data.red_flags || '')
       setLoading(false)
       if (data.project_id) {
+        localStorage.setItem('dashboard_selected_project', data.project_id)
         fetch(`/api/reports?project_id=${data.project_id}`)
           .then(r => r.json())
           .then(reports => setAllReports(Array.isArray(reports) ? reports.reverse() : []))
@@ -140,13 +141,18 @@ export default function ReportPage() {
   let estimatedAtContractFinish: number | null = null
   let trendFinishDate: string | null = null
 
-  const cumulatedData = allReports.map(r => computeProgress(r))
+  // Only use reports up through the one currently being viewed — an older report
+  // shouldn't show progress from weeks that come after it.
+  const currentReportIdx = allReports.findIndex(r => r.id === id)
+  const visibleReports = currentReportIdx >= 0 ? allReports.slice(0, currentReportIdx + 1) : allReports
+
+  const cumulatedData = visibleReports.map(r => computeProgress(r))
 
   if (cumulatedData.length >= 2) {
     const lastProgress = cumulatedData[cumulatedData.length - 1]
     const prevProgress = cumulatedData[cumulatedData.length - 2]
     const weeklyGain = lastProgress - prevProgress
-    const lastDate = allReports[allReports.length - 1]?.period_end
+    const lastDate = visibleReports[visibleReports.length - 1]?.period_end
 
     if (weeklyGain > 0 && lastDate) {
       const weeksTo100 = (100 - lastProgress) / weeklyGain
@@ -266,6 +272,13 @@ export default function ReportPage() {
     setTimeout(() => setPhotosJustSaved(false), 2500)
   }
 
+  function deleteAllPhotos() {
+    if (!confirm(`Delete all ${photos.length} photo(s)/attachment(s) from this report? This cannot be undone.`)) return
+    setPhotos([])
+    localStorage.setItem(`report_photos_${id}`, JSON.stringify([]))
+    setPhotosJustSaved(false)
+  }
+
   function removePhoto(idx: number) {
     const updated = photos.filter((_, i) => i !== idx)
     setPhotos(updated)
@@ -294,8 +307,8 @@ export default function ReportPage() {
       chartInstances.current.forEach(c => c?.destroy())
       chartInstances.current = []
 
-      const labels = allReports.map(r => r.period_end)
-      const cumData = allReports.map(r => computeProgress(r))
+      const labels = visibleReports.map(r => r.period_end)
+      const cumData = visibleReports.map(r => computeProgress(r))
       const actualData = cumData.map((v, i) => i === 0 ? v : parseFloat((v - cumData[i-1]).toFixed(2)))
 
       const allLabels = [...labels]
@@ -443,7 +456,7 @@ export default function ReportPage() {
       document.head.appendChild(s)
     }
     loadChartJS()
-  }, [allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart])
+  }, [id, allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart])
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Loading...</div>
   const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
@@ -883,6 +896,7 @@ ${photosHtml}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 14 }}>
                 {photosJustSaved && <span style={{ fontSize: 12, color: '#065f46' }}>✓ Saved</span>}
+                <button onClick={deleteAllPhotos} style={btn('#fef2f2', '#dc2626')}>🗑 Delete all photos</button>
                 <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
               </div>
             </>
