@@ -146,7 +146,7 @@ export default function DashboardPage() {
             <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
           </div>
 
-          <div className="s7-table-wrap" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <div className="s7-table-wrap s7-desktop-table" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -162,7 +162,7 @@ export default function DashboardPage() {
                     : filteredReports.slice(0, 30).map((r: any) => {
                       const prog = getReportProgress(r)
                       return (
-                        <tr key={r.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <tr key={r.id} onClick={() => router.push(`/reports/${r.id}`)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
                           <td style={{ padding: '11px 16px', fontWeight: 500, color: MCORE_DARK }}>{r.project?.name || '—'}</td>
                           <td style={{ padding: '11px 16px', color: '#6b7280' }}>{r.period_start} – {r.period_end}</td>
                           <td style={{ padding: '11px 16px' }}>
@@ -173,7 +173,7 @@ export default function DashboardPage() {
                               <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
                             </div>
                           </td>
-                          <td style={{ padding: '11px 16px', textAlign: 'right' }}>
+                          <td style={{ padding: '11px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                               {(() => {
                                 const { hasAny, thumb } = getPhotoInfo(r)
@@ -193,6 +193,41 @@ export default function DashboardPage() {
                     })}
               </tbody>
             </table>
+          </div>
+
+          {/* MOBILE CARD LIST — no horizontal scroll, tap anywhere on the card to open the report */}
+          <div className="s7-mobile-cards">
+            {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', background: '#fff', borderRadius: 12 }}>Loading...</div>
+              : filteredReports.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', background: '#fff', borderRadius: 12 }}>No reports yet. <Link href="/reports/new" style={{ color: ORANGE }}>Create first report</Link></div>
+                : filteredReports.slice(0, 30).map((r: any) => {
+                  const prog = getReportProgress(r)
+                  const { hasAny, thumb } = getPhotoInfo(r)
+                  return (
+                    <div key={r.id} onClick={() => router.push(`/reports/${r.id}`)}
+                      style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 14, marginBottom: 10, cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: MCORE_DARK, fontSize: 14 }}>{r.project?.name || '—'}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{r.period_start} – {r.period_end}</div>
+                        </div>
+                        {hasAny && (thumb
+                          ? <img src={thumb} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', border: '1px solid #e5e7eb', flexShrink: 0 }} />
+                          : <span style={{ fontSize: 16, flexShrink: 0 }}>📎</span>)}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                        <div style={{ flex: 1, height: 6, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
+                        <Link href={`/reports/${r.id}?edit=1`} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
+                        <button onClick={async () => { if(confirm('Delete this report?')) { await fetch(`/api/reports/${r.id}`, {method:'DELETE'}); setReports(prev => prev.filter(x => x.id !== r.id)) } }}
+                          style={{ ...btn('#fef2f2', '#dc2626'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Delete</button>
+                      </div>
+                    </div>
+                  )
+                })}
           </div>
         </main>
       </div>
