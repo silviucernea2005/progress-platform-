@@ -40,6 +40,8 @@ export default function ReportPage() {
   const [showMiniCharts, setShowMiniCharts] = useState(true)
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
+  const [rearrangeMode, setRearrangeMode] = useState(false)
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const [tenderStart, setTenderStart] = useState('')
@@ -472,6 +474,26 @@ export default function ReportPage() {
     setSelectedPhotoIds(new Set())
     setDeletePhotoMode(false)
     setPhotosJustSaved(false)
+  }
+
+  function movePhoto(index: number, direction: -1 | 1) {
+    setPhotos(prev => {
+      const next = [...prev]
+      const j = index + direction
+      if (j < 0 || j >= next.length) return prev
+      ;[next[index], next[j]] = [next[j], next[index]]
+      return next
+    })
+  }
+
+  async function savePhotoOrder() {
+    try {
+      await fetch(`/api/reports/${id}/photos`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: photos.map(p => p.id) })
+      })
+    } catch {}
+    setRearrangeMode(false)
   }
 
   // New report with preserved progress
@@ -1034,22 +1056,21 @@ ${photosHtml}
                 )}
               </div>
             </div>
-            <canvas ref={mainChartRef} height={220} />
+            <canvas ref={mainChartRef} height={175} />
           </div>
         )}
 
         {/* ACTIVITIES */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Activities Progress</h2>
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {acts.map((a: any) => {
             const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
             const displayProgress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
             return (
-              <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, minWidth: 560 }}>
-                <span style={{ width: 190, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
+              <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
+                <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
                 <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
-                <div style={{ flex: 1, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
                   <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
                 </div>
                 {editing ? (
@@ -1065,7 +1086,6 @@ ${photosHtml}
               </div>
             )
           })}
-          </div>
           {/* Weekly progress summary row */}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>Weekly Progress (this period)</span>
@@ -1104,66 +1124,98 @@ ${photosHtml}
         {/* PHOTOS / ATTACHMENTS */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Site Photos & Attachments</h2>
-          <div
-            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handlePhotoDrop}
-            style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius: 10, padding: 24, textAlign: 'center', background: dragOver ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s', marginBottom: 14, cursor: 'pointer' }}>
-            {uploadingPhoto ? (
-              <div style={{ color: BLUE, fontSize: 13 }}>Processing files...</div>
-            ) : (
-              <>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
-                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
-              </>
-            )}
-          </div>
+
           {photos.length > 0 && (
-            <>
-              <div className="s7-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-                {photos.map((p) => {
-                  const isSelected = selectedPhotoIds.has(p.id)
-                  const isImage = !!(p.url && !p.url.startsWith('data:text/plain'))
-                  const imagePhotos = photos.filter(ph => ph.url && !ph.url.startsWith('data:text/plain'))
-                  return (
-                    <div key={p.id}
-                      onClick={() => {
-                        if (deletePhotoMode) togglePhotoSelection(p.id)
-                        else if (isImage) setLightboxIndex(imagePhotos.findIndex(ph => ph.id === p.id))
-                      }}
-                      style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode || isImage ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : 'none' }}>
-                      {isImage ? (
-                        <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: deletePhotoMode && !isSelected ? 0.55 : 1 }} />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
-                      )}
-                      {deletePhotoMode && (
-                        <div style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 99, background: isSelected ? '#dc2626' : 'rgba(255,255,255,0.85)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff' }}>
-                          {isSelected ? '✓' : ''}
+            <div className="s7-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+              {photos.map((p, i) => {
+                const isSelected = selectedPhotoIds.has(p.id)
+                const isImage = !!(p.url && !p.url.startsWith('data:text/plain'))
+                const imagePhotos = photos.filter(ph => ph.url && !ph.url.startsWith('data:text/plain'))
+                return (
+                  <div key={p.id}
+                    onClick={() => {
+                      if (deletePhotoMode) togglePhotoSelection(p.id)
+                      else if (!rearrangeMode && isImage) setLightboxIndex(imagePhotos.findIndex(ph => ph.id === p.id))
+                    }}
+                    style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode || (isImage && !rearrangeMode) ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : 'none' }}>
+                    {isImage ? (
+                      <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: deletePhotoMode && !isSelected ? 0.55 : 1 }} />
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
+                    )}
+                    {deletePhotoMode && (
+                      <div style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 99, background: isSelected ? '#dc2626' : 'rgba(255,255,255,0.85)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff' }}>
+                        {isSelected ? '✓' : ''}
+                      </div>
+                    )}
+                    {rearrangeMode && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 6 }}>
+                        <button onClick={(e) => { e.stopPropagation(); movePhoto(i, -1) }} disabled={i === 0}
+                          style={{ width: 28, height: 28, borderRadius: 99, background: '#fff', border: 'none', cursor: i === 0 ? 'default' : 'pointer', opacity: i === 0 ? 0.4 : 1, fontSize: 16 }}>‹</button>
+                        <button onClick={(e) => { e.stopPropagation(); movePhoto(i, 1) }} disabled={i === photos.length - 1}
+                          style={{ width: 28, height: 28, borderRadius: 99, background: '#fff', border: 'none', cursor: i === photos.length - 1 ? 'default' : 'pointer', opacity: i === photos.length - 1 ? 0.4 : 1, fontSize: 16 }}>›</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {editing && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              {photosJustSaved && <span style={{ fontSize: 12, color: '#065f46' }}>✓ Saved</span>}
+              {deletePhotoMode ? (
+                <>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoIds.size} selectate</span>
+                  <button onClick={() => { setDeletePhotoMode(false); setSelectedPhotoIds(new Set()) }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
+                  <button onClick={deleteSelectedPhotos} disabled={!selectedPhotoIds.size} style={btn('#dc2626')}>🗑 Delete selected</button>
+                </>
+              ) : rearrangeMode ? (
+                <>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>Folosește ‹ › pentru a schimba ordinea</span>
+                  <button onClick={savePhotoOrder} style={btn(BLUE)}>✓ Done rearranging</button>
+                </>
+              ) : (
+                <>
+                  {photos.length > 0 && (
+                    <div style={{ position: 'relative' }}>
+                      <button onClick={() => setShowPhotoMenu(!showPhotoMenu)} style={btn('#fef2f2', '#dc2626')}>🗑 Photo actions ▾</button>
+                      {showPhotoMenu && (
+                        <div onMouseLeave={() => setShowPhotoMenu(false)}
+                          style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 180 }}>
+                          <button onClick={() => { setShowPhotoMenu(false); deleteAllPhotos() }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>🗑 Delete all photos</button>
+                          <button onClick={() => { setShowPhotoMenu(false); setDeletePhotoMode(true) }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>🗑 Delete photo</button>
+                          <button onClick={() => { setShowPhotoMenu(false); setRearrangeMode(true) }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>↔️ Rearrange photo</button>
                         </div>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 14 }}>
-                {photosJustSaved && <span style={{ fontSize: 12, color: '#065f46' }}>✓ Saved</span>}
-                {deletePhotoMode ? (
-                  <>
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoIds.size} selectate</span>
-                    <button onClick={() => { setDeletePhotoMode(false); setSelectedPhotoIds(new Set()) }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
-                    <button onClick={deleteSelectedPhotos} disabled={!selectedPhotoIds.size} style={btn('#dc2626')}>🗑 Delete selected</button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => setDeletePhotoMode(true)} style={btn('#fef2f2', '#dc2626')}>🗑 Select photos to delete</button>
-                    <button onClick={deleteAllPhotos} style={btn('#fef2f2', '#dc2626')}>🗑 Delete all photos</button>
-                    <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
-                  </>
-                )}
-              </div>
-            </>
+                  )}
+                  <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
+                </>
+              )}
+            </div>
+          )}
+
+          {editing && (
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handlePhotoDrop}
+              style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius: 10, padding: 24, textAlign: 'center', background: dragOver ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s', cursor: 'pointer' }}>
+              {uploadingPhoto ? (
+                <div style={{ color: BLUE, fontSize: 13 }}>Processing files...</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
+                </>
+              )}
+            </div>
           )}
         </div>
 
