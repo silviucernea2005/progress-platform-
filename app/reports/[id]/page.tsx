@@ -41,6 +41,7 @@ export default function ReportPage() {
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
   const [rearrangeMode, setRearrangeMode] = useState(false)
+  const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null)
   const [showPhotoMenu, setShowPhotoMenu] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
@@ -673,6 +674,45 @@ export default function ReportPage() {
   const lbl = { display: 'block' as any, fontSize: 11, color: '#6b7280', marginBottom: 3 }
   const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 } as any)
 
+  // Client-side Excel export — Summary / Activities / Notes sheets
+  async function exportExcel() {
+    const XLSX = await import('xlsx')
+
+    const summaryRows = [
+      ['Project', report.project?.name || ''],
+      ['Period', `${report.period_start} – ${report.period_end}`],
+      ['Weighted Progress', `${totalProgress.toFixed(2)}%`],
+      ['Weekly Progress', `${weeklyProgress}%`],
+      ...(contractFinish ? [['Contract Finish', contractFinish], ['Days Remaining', String(daysBetween(today, contractFinish))]] : []),
+      ...(estimatedAtContractFinish !== null ? [['Estimated at Contract Finish', `${estimatedAtContractFinish.toFixed(1)}%`]] : []),
+      ...(trendFinishDate ? [['Trend Finish Date', trendFinishDate]] : []),
+    ]
+
+    const activityRows = [
+      ['Activity', 'Weight (%)', 'Progress (%)', 'Contribution (%)', 'Status'],
+      ...acts.map((a: any) => {
+        const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
+        const contribution = (a.progress * w / 100).toFixed(2)
+        const status = a.progress === 0 ? 'Not started' : a.progress < 100 ? 'In progress' : 'Completed'
+        return [a.activity?.name || '', w, a.progress, Number(contribution), status]
+      }),
+      ['TOTAL', 100, '', Number(totalProgress.toFixed(2)), '']
+    ]
+
+    const notesRows = [
+      ['Works Completed', worksDone || '—'],
+      ['Works Planned', worksPlanned || '—'],
+      ['Red Flags', redFlags || '—'],
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(activityRows), 'Activities')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notesRows), 'Notes')
+
+    XLSX.writeFile(wb, `Raport_${report.project?.name}_${report.period_start}.xlsx`)
+  }
+
   // Client-side PDF export — opens in a NEW tab so the current report/dashboard is never lost,
   // and includes the charts + photos which only exist in this browser (not on the server).
   function exportPdfClientSide() {
@@ -894,6 +934,8 @@ ${photosHtml}
                   style={{ display: 'block', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, textDecoration: 'none' }}>📄 Word</a>
                 <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
+                <button onClick={() => { setShowExportMenu(false); exportExcel() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📊 Excel</button>
               </div>
             )}
           </div>
@@ -1020,7 +1062,7 @@ ${photosHtml}
             </div>
           </div>
           <div style={{ marginTop: 14, height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(totalProgress, 100)}%`, transition: 'width 0.5s' }} />
+            <div style={{ height: '100%', background: allReports.length >= 1 ? '#059669' : ORANGE, borderRadius: 99, width: `${Math.min(totalProgress, 100)}%`, transition: 'width 0.5s' }} />
           </div>
         </div>
 
@@ -1112,15 +1154,6 @@ ${photosHtml}
           ))}
         </div>
 
-        {editing && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 20 }}>
-            <button onClick={toggleFullEdit} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-            <button onClick={saveAllEdits} disabled={saving || savingPeriod} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
-              {saving || savingPeriod ? 'Saving...' : '💾 Save all changes'}
-            </button>
-          </div>
-        )}
-
         {/* PHOTOS / ATTACHMENTS */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Site Photos & Attachments</h2>
@@ -1133,11 +1166,25 @@ ${photosHtml}
                 const imagePhotos = photos.filter(ph => ph.url && !ph.url.startsWith('data:text/plain'))
                 return (
                   <div key={p.id}
+                    draggable={rearrangeMode}
+                    onDragStart={() => setDraggedPhotoIndex(i)}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      if (!rearrangeMode || draggedPhotoIndex === null || draggedPhotoIndex === i) return
+                      setPhotos(prev => {
+                        const next = [...prev]
+                        const [moved] = next.splice(draggedPhotoIndex, 1)
+                        next.splice(i, 0, moved)
+                        return next
+                      })
+                      setDraggedPhotoIndex(i)
+                    }}
+                    onDragEnd={() => setDraggedPhotoIndex(null)}
                     onClick={() => {
                       if (deletePhotoMode) togglePhotoSelection(p.id)
                       else if (!rearrangeMode && isImage) setLightboxIndex(imagePhotos.findIndex(ph => ph.id === p.id))
                     }}
-                    style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode || (isImage && !rearrangeMode) ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : 'none' }}>
+                    style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode ? 'pointer' : rearrangeMode ? 'grab' : isImage ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : draggedPhotoIndex === i ? '3px solid #185FA5' : 'none', opacity: rearrangeMode && draggedPhotoIndex === i ? 0.5 : 1 }}>
                     {isImage ? (
                       <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: deletePhotoMode && !isSelected ? 0.55 : 1 }} />
                     ) : (
@@ -1173,29 +1220,26 @@ ${photosHtml}
                 </>
               ) : rearrangeMode ? (
                 <>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>Folosește ‹ › pentru a schimba ordinea</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>Trage pozele cu mouse-ul (sau ‹ ›) pentru a schimba ordinea</span>
                   <button onClick={savePhotoOrder} style={btn(BLUE)}>✓ Done rearranging</button>
                 </>
               ) : (
-                <>
-                  {photos.length > 0 && (
-                    <div style={{ position: 'relative' }}>
-                      <button onClick={() => setShowPhotoMenu(!showPhotoMenu)} style={btn('#fef2f2', '#dc2626')}>🗑 Photo actions ▾</button>
-                      {showPhotoMenu && (
-                        <div onMouseLeave={() => setShowPhotoMenu(false)}
-                          style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 180 }}>
-                          <button onClick={() => { setShowPhotoMenu(false); deleteAllPhotos() }}
-                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>🗑 Delete all photos</button>
-                          <button onClick={() => { setShowPhotoMenu(false); setDeletePhotoMode(true) }}
-                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>🗑 Delete photo</button>
-                          <button onClick={() => { setShowPhotoMenu(false); setRearrangeMode(true) }}
-                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>↔️ Rearrange photo</button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
-                </>
+                photos.length > 0 && (
+                  <div style={{ position: 'relative' }}>
+                    <button onClick={() => setShowPhotoMenu(!showPhotoMenu)} style={btn('#fef2f2', '#dc2626')}>🗑 Photo actions ▾</button>
+                    {showPhotoMenu && (
+                      <div onMouseLeave={() => setShowPhotoMenu(false)}
+                        style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 180 }}>
+                        <button onClick={() => { setShowPhotoMenu(false); deleteAllPhotos() }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>🗑 Delete all photos</button>
+                        <button onClick={() => { setShowPhotoMenu(false); setDeletePhotoMode(true) }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>🗑 Delete photo</button>
+                        <button onClick={() => { setShowPhotoMenu(false); setRearrangeMode(true) }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>↔️ Rearrange photo</button>
+                      </div>
+                    )}
+                  </div>
+                )
               )}
             </div>
           )}
@@ -1218,6 +1262,15 @@ ${photosHtml}
             </div>
           )}
         </div>
+
+        {editing && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+            <button onClick={toggleFullEdit} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={saveAllEdits} disabled={saving || savingPeriod} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
+              {saving || savingPeriod ? 'Saving...' : '💾 Save all changes'}
+            </button>
+          </div>
+        )}
 
       </main>
 
