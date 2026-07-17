@@ -15,9 +15,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json()
+    const update: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (body.works_done !== undefined) update.works_done = body.works_done
+    if (body.works_planned !== undefined) update.works_planned = body.works_planned
+    if (body.red_flags !== undefined) update.red_flags = body.red_flags
+    if (body.period_start !== undefined) update.period_start = body.period_start
+    if (body.period_end !== undefined) update.period_end = body.period_end
     const { error } = await supabase
       .from('reports')
-      .update({ works_done: body.works_done, works_planned: body.works_planned, red_flags: body.red_flags, updated_at: new Date().toISOString() })
+      .update(update)
       .eq('id', params.id)
     if (error) throw error
     return NextResponse.json({ ok: true })
