@@ -50,18 +50,12 @@ export default function DashboardPage() {
     return acts.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
   }
 
-  // Photos live only in this browser's localStorage (per report id) — check for a thumbnail/attachment indicator
-  function getPhotoInfo(reportId: string): { hasAny: boolean; thumb: string | null } {
-    try {
-      const saved = localStorage.getItem(`report_photos_${reportId}`)
-      if (!saved) return { hasAny: false, thumb: null }
-      const photos = JSON.parse(saved)
-      if (!Array.isArray(photos) || !photos.length) return { hasAny: false, thumb: null }
-      const firstImage = photos.find((p: string) => typeof p === 'string' && p.startsWith('data:image'))
-      return { hasAny: true, thumb: firstImage || null }
-    } catch {
-      return { hasAny: false, thumb: null }
-    }
+  // Photos now live on the server — the reports list already includes them (see /api/reports)
+  function getPhotoInfo(r: any): { hasAny: boolean; thumb: string | null } {
+    const list = r.photos
+    if (!Array.isArray(list) || !list.length) return { hasAny: false, thumb: null }
+    const firstImage = list.find((p: any) => typeof p.url === 'string' && !p.url.startsWith('data:text/plain'))
+    return { hasAny: true, thumb: firstImage?.url || null }
   }
 
   const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 7, padding: '7px 15px', fontSize: 13, cursor: 'pointer', fontWeight: 500, textDecoration: 'none', display: 'inline-block' } as any)
@@ -180,7 +174,7 @@ export default function DashboardPage() {
                           <td style={{ padding: '11px 16px', textAlign: 'right' }}>
                             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                               {(() => {
-                                const { hasAny, thumb } = getPhotoInfo(r.id)
+                                const { hasAny, thumb } = getPhotoInfo(r)
                                 if (!hasAny) return null
                                 return thumb
                                   ? <img src={thumb} title="Has photos" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', border: '1px solid #e5e7eb' }} />
