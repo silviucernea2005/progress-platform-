@@ -63,7 +63,7 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
       {/* HEADER */}
-      <header style={{ background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <header className="s7-header-row" style={{ background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ background: BLUE, borderRadius: 8, padding: '4px 10px', fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>S7</div>
           <div>
@@ -73,15 +73,15 @@ export default function DashboardPage() {
           <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
           <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
-        <nav style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <nav style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <Link href="/projects/new" style={{ color: 'rgba(255,255,255,0.65)', textDecoration: 'none', fontSize: 13 }}>+ New Project</Link>
           <Link href="/reports/new" style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
         </nav>
       </header>
 
-      <div style={{ display: 'flex', flex: 1 }}>
+      <div className="s7-dash-body" style={{ display: 'flex', flex: 1 }}>
         {/* SIDEBAR */}
-        <aside style={{ width: 230, background: '#fff', borderRight: '1px solid #e5e7eb', flexShrink: 0, overflowY: 'auto' }}>
+        <aside className="s7-dash-sidebar" style={{ width: 230, background: '#fff', borderRight: '1px solid #e5e7eb', flexShrink: 0, overflowY: 'auto' }}>
           <div style={{ padding: '16px 16px 8px', fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 1.2 }}>PROJECTS</div>
 
           {/* Dropdown for mobile / quick select */}
@@ -93,6 +93,7 @@ export default function DashboardPage() {
             </select>
           </div>
 
+          <div className="s7-dash-projectlist">
           <div onClick={() => setSelectedProject('all')}
             style={{ padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: selectedProject === 'all' ? 600 : 400, color: selectedProject === 'all' ? MCORE_DARK : '#374151', background: selectedProject === 'all' ? '#f5f5f3' : 'transparent', borderLeft: selectedProject === 'all' ? `3px solid ${MCORE_DARK}` : '3px solid transparent' }}>
             All Projects
@@ -118,12 +119,13 @@ export default function DashboardPage() {
                 </div>
               )
             })}
+          </div>
         </aside>
 
         {/* MAIN */}
         <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
           {/* KPIs */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+          <div className="s7-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
             {[
               { label: 'Active Projects', value: loading ? '—' : projects.filter(p => p.status === 'active').length, color: BLUE_DARK },
               { label: 'Total Reports', value: loading ? '—' : filteredReports.length, color: '#374151' },
@@ -137,14 +139,14 @@ export default function DashboardPage() {
           </div>
 
           {/* REPORTS TABLE */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: MCORE_DARK, margin: 0 }}>
               {selectedProject === 'all' ? 'All Reports' : `Reports — ${projects.find(p => p.id === selectedProject)?.name || ''}`}
             </h2>
             <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
           </div>
 
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <div className="s7-table-wrap" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
