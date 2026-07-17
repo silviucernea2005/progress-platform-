@@ -1,4 +1,4 @@
-'use client'
+  'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
@@ -37,6 +37,7 @@ export default function ReportPage() {
   const [periodError, setPeriodError] = useState('')
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -326,6 +327,18 @@ export default function ReportPage() {
   }
 
   // Photo drag & drop — supports images, PDF, Excel, Word (extract embedded images/pages automatically)
+  useEffect(() => {
+    if (lightboxIndex === null) return
+    const imagePhotos = photos.filter(p => p.url && !p.url.startsWith('data:text/plain'))
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLightboxIndex(null)
+      if (e.key === 'ArrowRight') setLightboxIndex(i => i === null ? null : (i + 1) % imagePhotos.length)
+      if (e.key === 'ArrowLeft') setLightboxIndex(i => i === null ? null : (i - 1 + imagePhotos.length) % imagePhotos.length)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lightboxIndex, photos])
+
   async function handlePhotoDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
@@ -1101,10 +1114,16 @@ ${photosHtml}
               <div className="s7-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
                 {photos.map((p) => {
                   const isSelected = selectedPhotoIds.has(p.id)
+                  const isImage = !!(p.url && !p.url.startsWith('data:text/plain'))
+                  const imagePhotos = photos.filter(ph => ph.url && !ph.url.startsWith('data:text/plain'))
                   return (
-                    <div key={p.id} onClick={() => deletePhotoMode && togglePhotoSelection(p.id)}
-                      style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : 'none' }}>
-                      {p.url && !p.url.startsWith('data:text/plain') ? (
+                    <div key={p.id}
+                      onClick={() => {
+                        if (deletePhotoMode) togglePhotoSelection(p.id)
+                        else if (isImage) setLightboxIndex(imagePhotos.findIndex(ph => ph.id === p.id))
+                      }}
+                      style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode || isImage ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : 'none' }}>
+                      {isImage ? (
                         <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: deletePhotoMode && !isSelected ? 0.55 : 1 }} />
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
@@ -1139,6 +1158,36 @@ ${photosHtml}
         </div>
 
       </main>
+
+      {/* PHOTO LIGHTBOX */}
+      {lightboxIndex !== null && (() => {
+        const imagePhotos = photos.filter(p => p.url && !p.url.startsWith('data:text/plain'))
+        if (!imagePhotos.length) return null
+        const idx = ((lightboxIndex % imagePhotos.length) + imagePhotos.length) % imagePhotos.length
+        const current = imagePhotos[idx]
+        return (
+          <div onClick={() => setLightboxIndex(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={(e) => { e.stopPropagation(); setLightboxIndex(null) }}
+              style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 40, height: 40, fontSize: 20, cursor: 'pointer' }}>×</button>
+
+            {imagePhotos.length > 1 && (
+              <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((idx - 1 + imagePhotos.length) % imagePhotos.length) }}
+                style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 44, height: 44, fontSize: 22, cursor: 'pointer' }}>‹</button>
+            )}
+
+            <img src={current.url} onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '90vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 6 }} />
+
+            {imagePhotos.length > 1 && (
+              <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((idx + 1) % imagePhotos.length) }}
+                style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 44, height: 44, fontSize: 22, cursor: 'pointer' }}>›</button>
+            )}
+
+            <div style={{ position: 'absolute', bottom: 20, color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{idx + 1} / {imagePhotos.length}</div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
