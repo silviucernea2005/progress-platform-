@@ -6,7 +6,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const projectId = searchParams.get('project_id')
-  let q = supabase.from('reports').select('*, project:projects(id,name), activities:report_activities(*, activity:activities(*))').order('period_start', { ascending: false })
+  let q = supabase.from('reports').select('*, project:projects(id,name), activities:report_activities(*, activity:activities(*)), photos:report_photos(id,url)').order('period_start', { ascending: false })
   if (projectId) q = q.eq('project_id', projectId)
   const { data, error } = await q
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
