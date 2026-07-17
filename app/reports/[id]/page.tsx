@@ -28,6 +28,7 @@ export default function ReportPage() {
   const [editingWeights, setEditingWeights] = useState(false)
   const [weights, setWeights] = useState<Record<number, number>>({})
   const [photosJustSaved, setPhotosJustSaved] = useState(false)
+  const [settingsLoadError, setSettingsLoadError] = useState('')
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -67,7 +68,13 @@ export default function ReportPage() {
         const legacyDates = localStorage.getItem(`project_dates_${data.project_id}`)
         const legacyWeights = localStorage.getItem(`project_weights_${data.project_id}`)
         try {
-          const settingsRes = await fetch(`/api/projects/${data.project_id}/settings`).then(r => r.json())
+          const settingsFetch = await fetch(`/api/projects/${data.project_id}/settings`)
+          if (!settingsFetch.ok) {
+            const err = await settingsFetch.json().catch(() => ({}))
+            console.error('Failed to load project settings:', err)
+            setSettingsLoadError(`Nu s-au putut încărca datele de proiect de pe server (${err.error || settingsFetch.status}). Datele afișate pot fi incomplete.`)
+          }
+          const settingsRes = await settingsFetch.json()
           let d = settingsRes?.dates || {}
           let w = settingsRes?.weights || {}
           const isEmpty = (o: any) => !o || Object.keys(o).length === 0
@@ -88,7 +95,10 @@ export default function ReportPage() {
           setConstructionStart(d.constructionStart || ''); setConstructionFinishEstimated(d.constructionFinishEstimated || '')
           setContractStart(d.contractStart || ''); setContractFinish(d.contractFinish || '')
           setWeights(w)
-        } catch {}
+        } catch (e) {
+          console.error('Error loading project settings:', e)
+          setSettingsLoadError('Eroare neașteptată la încărcarea datelor de proiect de pe server.')
+        }
 
         // Photos now live on the server too. Migrate any left over from this browser's
         // localStorage (from before the switch) the first time this report is opened.
@@ -766,7 +776,7 @@ ${photosHtml}
 
       {/* STICKY HEADER */}
       <header className="s7-header-row" style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>Square 7</div>
@@ -788,6 +798,12 @@ ${photosHtml}
       </header>
 
       <main className="s7-main-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px' }}>
+
+        {settingsLoadError && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 12, marginBottom: 16 }}>
+            ⚠️ {settingsLoadError}
+          </div>
+        )}
 
         {/* PROJECT DATES — collapsible */}
         {showDates && (
