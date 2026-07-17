@@ -88,7 +88,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const activitiesTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: activityRows })
 
-    function notesSection(title: string, color: string, text: string) {
+    const notesSection = (title: string, color: string, text: string) => {
       return [
         new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: title, bold: true, color, size: 22, font: 'Arial' })] }),
         new Paragraph({ children: [new TextRun({ text: text || '—', size: 20, font: 'Arial' })] }),
