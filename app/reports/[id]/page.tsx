@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
 const BLUE = '#185FA5'
@@ -12,6 +12,7 @@ const HEADER_BG = '#1e3a5f'  // pleasant dark blue instead of black
 export default function ReportPage() {
   const { id } = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [report, setReport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [allReports, setAllReports] = useState<any[]>([])
@@ -34,6 +35,8 @@ export default function ReportPage() {
   const [periodEnd, setPeriodEnd] = useState('')
   const [savingPeriod, setSavingPeriod] = useState(false)
   const [periodError, setPeriodError] = useState('')
+  const [deletePhotoMode, setDeletePhotoMode] = useState(false)
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -63,6 +66,7 @@ export default function ReportPage() {
       setPeriodStart(data.period_start || '')
       setPeriodEnd(data.period_end || '')
       setLoading(false)
+      if (searchParams.get('edit') === '1') setEditing(true)
       if (data.project_id) {
         localStorage.setItem('dashboard_selected_project', data.project_id)
         fetch(`/api/reports?project_id=${data.project_id}`)
@@ -431,6 +435,27 @@ export default function ReportPage() {
     fetch(`/api/reports/${id}/photos`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId }) })
       .catch(() => {})
     setPhotos(prev => prev.filter(p => p.id !== photoId))
+    setPhotosJustSaved(false)
+  }
+
+  function togglePhotoSelection(photoId: string) {
+    setSelectedPhotoIds(prev => {
+      const next = new Set(prev)
+      if (next.has(photoId)) next.delete(photoId)
+      else next.add(photoId)
+      return next
+    })
+  }
+
+  function deleteSelectedPhotos() {
+    if (!selectedPhotoIds.size) return
+    if (!confirm(`Delete ${selectedPhotoIds.size} selected photo(s)? This cannot be undone.`)) return
+    selectedPhotoIds.forEach(photoId => {
+      fetch(`/api/reports/${id}/photos`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId }) }).catch(() => {})
+    })
+    setPhotos(prev => prev.filter(p => !selectedPhotoIds.has(p.id)))
+    setSelectedPhotoIds(new Set())
+    setDeletePhotoMode(false)
     setPhotosJustSaved(false)
   }
 
@@ -1074,22 +1099,40 @@ ${photosHtml}
           {photos.length > 0 && (
             <>
               <div className="s7-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-                {photos.map((p) => (
-                  <div key={p.id} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
-                    {p.url && !p.url.startsWith('data:text/plain') ? (
-                      <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
-                    )}
-                    <button onClick={() => removePhoto(p.id)}
-                      style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 99, width: 22, height: 22, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                  </div>
-                ))}
+                {photos.map((p) => {
+                  const isSelected = selectedPhotoIds.has(p.id)
+                  return (
+                    <div key={p.id} onClick={() => deletePhotoMode && togglePhotoSelection(p.id)}
+                      style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6', cursor: deletePhotoMode ? 'pointer' : 'default', outline: isSelected ? '3px solid #dc2626' : 'none' }}>
+                      {p.url && !p.url.startsWith('data:text/plain') ? (
+                        <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: deletePhotoMode && !isSelected ? 0.55 : 1 }} />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
+                      )}
+                      {deletePhotoMode && (
+                        <div style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 99, background: isSelected ? '#dc2626' : 'rgba(255,255,255,0.85)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff' }}>
+                          {isSelected ? '✓' : ''}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 14 }}>
                 {photosJustSaved && <span style={{ fontSize: 12, color: '#065f46' }}>✓ Saved</span>}
-                <button onClick={deleteAllPhotos} style={btn('#fef2f2', '#dc2626')}>🗑 Delete all photos</button>
-                <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
+                {deletePhotoMode ? (
+                  <>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoIds.size} selectate</span>
+                    <button onClick={() => { setDeletePhotoMode(false); setSelectedPhotoIds(new Set()) }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
+                    <button onClick={deleteSelectedPhotos} disabled={!selectedPhotoIds.size} style={btn('#dc2626')}>🗑 Delete selected</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setDeletePhotoMode(true)} style={btn('#fef2f2', '#dc2626')}>🗑 Select photos to delete</button>
+                    <button onClick={deleteAllPhotos} style={btn('#fef2f2', '#dc2626')}>🗑 Delete all photos</button>
+                    <button onClick={savePhotosNow} style={btn(BLUE)}>💾 Save Photos</button>
+                  </>
+                )}
               </div>
             </>
           )}
