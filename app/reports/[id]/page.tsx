@@ -1,4 +1,4 @@
-  'use client'
+'use client'
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
@@ -35,6 +35,9 @@ export default function ReportPage() {
   const [periodEnd, setPeriodEnd] = useState('')
   const [savingPeriod, setSavingPeriod] = useState(false)
   const [periodError, setPeriodError] = useState('')
+  const [activityProgress, setActivityProgress] = useState<Record<number, number>>({})
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showMiniCharts, setShowMiniCharts] = useState(true)
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -66,6 +69,7 @@ export default function ReportPage() {
       setRedFlags(data.red_flags || '')
       setPeriodStart(data.period_start || '')
       setPeriodEnd(data.period_end || '')
+      setActivityProgress(Object.fromEntries((data.activities || []).map((a: any) => [a.activity_id, a.progress])))
       setLoading(false)
       if (searchParams.get('edit') === '1') setEditing(true)
       if (data.project_id) {
@@ -160,63 +164,61 @@ export default function ReportPage() {
     setShowDates(false)
   }
 
-  async function saveWeights() {
-    if (!report?.project_id) return
-    try {
-      const res = await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        alert(`Nu s-au putut salva ponderile pe server: ${err.error || res.status}. Ponderile NU sunt vizibile pe alte computere până nu se rezolvă.`)
-        return
-      }
-    } catch {
-      alert('Eroare de rețea la salvarea ponderilor. Verifică conexiunea și încearcă din nou.')
-      return
-    }
-    setEditingWeights(false)
-  }
-
   function getWeight(activityId: number, defaultWeight: number) {
     return weights[activityId] !== undefined ? weights[activityId] : defaultWeight
   }
 
-  async function savePeriod() {
+  function toggleFullEdit() {
+    const turningOn = !editing
+    if (turningOn) {
+      setPeriodStart(report.period_start || '')
+      setPeriodEnd(report.period_end || '')
+      setActivityProgress(Object.fromEntries(acts.map((a: any) => [a.activity_id, a.progress])))
+      setPeriodError('')
+    }
+    setEditing(turningOn)
+    setEditingWeights(turningOn)
+    setEditingPeriod(turningOn)
+  }
+
+  async function saveAllEdits() {
     setPeriodError('')
     if (periodStart && periodEnd && periodStart > periodEnd) {
       setPeriodError('Data de start nu poate fi după data de final.')
       return
     }
+    setSaving(true)
     setSavingPeriod(true)
     try {
       const res = await fetch(`/api/reports/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period_start: periodStart, period_end: periodEnd })
+        body: JSON.stringify({
+          period_start: periodStart, period_end: periodEnd,
+          works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags,
+          activities: acts.map((a: any) => ({ activity_id: a.activity_id, progress: activityProgress[a.activity_id] ?? a.progress }))
+        })
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         setPeriodError(`Nu s-a putut salva: ${err.error || res.status}`)
-        setSavingPeriod(false)
+        setSaving(false); setSavingPeriod(false)
         return
       }
-      setReport((r: any) => ({ ...r, period_start: periodStart, period_end: periodEnd }))
-      setEditingPeriod(false)
+      if (report?.project_id) {
+        await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).catch(() => {})
+      }
+      setReport((r: any) => ({
+        ...r, period_start: periodStart, period_end: periodEnd,
+        works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags,
+        activities: (r.activities || []).map((a: any) => ({ ...a, progress: activityProgress[a.activity_id] ?? a.progress }))
+      }))
+      setEditing(false); setEditingWeights(false); setEditingPeriod(false)
     } catch {
       setPeriodError('Eroare de rețea. Verifică conexiunea și încearcă din nou.')
     }
-    setSavingPeriod(false)
-  }
-
-  async function saveText() {
-    setSaving(true)
-    await fetch(`/api/reports/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags })
-    })
-    setReport((r: any) => ({ ...r, works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags }))
     setSaving(false)
-    setEditing(false)
+    setSavingPeriod(false)
   }
 
   async function deleteReport() {
@@ -695,7 +697,7 @@ export default function ReportPage() {
       ['Contracting', contractingChartImg, contractingTotal],
       ['Construction', constructionChartImg, constructionTotal],
     ]
-    const miniChartsHtml = miniCharts.some(m => m[1]) ? `
+    const miniChartsHtml = showMiniCharts && miniCharts.some(m => m[1]) ? `
     <div class="section">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
         ${miniCharts.map(([label, img, total]) => `
@@ -858,14 +860,22 @@ ${photosHtml}
           <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Progress Platform</span>
         </div>
         <div className="s7-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => { setEditingPeriod(!editingPeriod); setPeriodError('') }} style={btn('rgba(255,255,255,0.1)')}>🗓️ Edit Period</button>
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
-          <button onClick={() => setEditing(!editing)} style={btn('rgba(255,255,255,0.1)')}>✏️ Edit text</button>
-          <button onClick={() => setEditingWeights(!editingWeights)} style={btn('rgba(255,255,255,0.1)')}>⚖️ Weights</button>
-          <a href={`/api/reports/${id}/export-word`} style={{ ...btn('rgba(255,255,255,0.1)'), textDecoration: 'none' }}>📄 Word</a>
-          <button onClick={exportPdfClientSide} style={btn(BLUE)}>📑 PDF</button>
+          <button onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
+          <button onClick={toggleFullEdit} style={btn(editing ? ORANGE : 'rgba(255,255,255,0.1)')}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
+            {showExportMenu && (
+              <div onMouseLeave={() => setShowExportMenu(false)}
+                style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
+                <a href={`/api/reports/${id}/export-word`} onClick={() => setShowExportMenu(false)}
+                  style={{ display: 'block', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, textDecoration: 'none' }}>📄 Word</a>
+                <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
+              </div>
+            )}
+          </div>
           <button onClick={handleNewReport} style={btn(ORANGE)}>+ New Report</button>
-          <button onClick={deleteReport} disabled={deleting} style={btn('#dc2626')}>🗑</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
         </div>
       </header>
@@ -881,7 +891,7 @@ ${photosHtml}
         {/* EDIT REPORT PERIOD */}
         {editingPeriod && (
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Edit Report Period</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Report Period</h2>
             <div className="s7-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 420 }}>
               <div>
                 <label style={lbl}>Period start</label>
@@ -893,10 +903,6 @@ ${photosHtml}
               </div>
             </div>
             {periodError && <div style={{ color: '#dc2626', fontSize: 12, marginTop: 10 }}>{periodError}</div>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <button onClick={savePeriod} disabled={savingPeriod} style={btn(BLUE)}>{savingPeriod ? 'Se salvează...' : 'Save'}</button>
-              <button onClick={() => { setEditingPeriod(false); setPeriodStart(report.period_start || ''); setPeriodEnd(report.period_end || ''); setPeriodError('') }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
-            </div>
           </div>
         )}
 
@@ -932,13 +938,10 @@ ${photosHtml}
         {editingWeights && (
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Edit Activity Weights</h2>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#ecfdf5' : '#fef2f2', color: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#065f46' : '#dc2626' }}>
-                  Total: {acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0)}%
-                </span>
-                <button onClick={saveWeights} style={btn(BLUE)}>Save weights</button>
-              </div>
+              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Activity Weights</h2>
+              <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#ecfdf5' : '#fef2f2', color: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#065f46' : '#dc2626' }}>
+                Total: {acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0)}%
+              </span>
             </div>
             <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
               {acts.map((a: any) => (
@@ -1000,7 +1003,7 @@ ${photosHtml}
         </div>
 
         {/* 3 MINI CHARTS */}
-        <div className="s7-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div className="s7-grid-3" style={{ display: showMiniCharts ? 'grid' : 'none', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
             { ref: tenderChartRef, total: tenderTotal, label: 'Tender' },
             { ref: contractingChartRef, total: contractingTotal, label: 'Contracting' },
@@ -1041,16 +1044,23 @@ ${photosHtml}
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {acts.map((a: any) => {
             const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
+            const displayProgress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
             return (
               <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, minWidth: 560 }}>
                 <span style={{ width: 190, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
                 <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
                 <div style={{ flex: 1, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, width: `${a.progress}%`, background: a.progress === 100 ? MCORE_DARK : a.progress > 0 ? ORANGE : '#e5e7eb', transition: 'width 0.3s' }} />
+                  <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
                 </div>
-                <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: a.progress === 0 ? '#f3f4f6' : a.progress < 100 ? '#fef3c7' : '#ecfdf5', color: a.progress === 0 ? '#6b7280' : a.progress < 100 ? '#92400e' : '#065f46' }}>
-                  {a.progress === 0 ? 'Not started' : a.progress < 100 ? 'In progress' : 'Completed'}
+                {editing ? (
+                  <input type="number" min={0} max={100} value={activityProgress[a.activity_id] ?? a.progress}
+                    onChange={e => setActivityProgress(prev => ({ ...prev, [a.activity_id]: Number(e.target.value) }))}
+                    style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
+                ) : (
+                  <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
+                )}
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: displayProgress === 0 ? '#f3f4f6' : displayProgress < 100 ? '#dbeafe' : '#dcfce7', color: displayProgress === 0 ? '#6b7280' : displayProgress < 100 ? '#1e40af' : '#166534' }}>
+                  {displayProgress === 0 ? 'Not started' : displayProgress < 100 ? 'In progress' : 'Completed'}
                 </span>
               </div>
             )
@@ -1084,9 +1094,9 @@ ${photosHtml}
 
         {editing && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 20 }}>
-            <button onClick={() => setEditing(false)} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-            <button onClick={saveText} disabled={saving} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
-              {saving ? 'Saving...' : 'Save text'}
+            <button onClick={toggleFullEdit} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={saveAllEdits} disabled={saving || savingPeriod} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
+              {saving || savingPeriod ? 'Saving...' : '💾 Save all changes'}
             </button>
           </div>
         )}
