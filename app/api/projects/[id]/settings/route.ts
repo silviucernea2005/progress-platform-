@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -10,7 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('project_id', params.id)
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data || { dates: {}, weights: {} })
+  return NextResponse.json(data || { dates: {}, weights: {} }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
 }
 
 // Body: { dates?: {...}, weights?: {...} } — only the keys provided get updated, the rest are preserved
