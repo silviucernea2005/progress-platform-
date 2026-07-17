@@ -24,11 +24,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.red_flags !== undefined) update.red_flags = body.red_flags
     if (body.period_start !== undefined) update.period_start = body.period_start
     if (body.period_end !== undefined) update.period_end = body.period_end
-    const { error } = await supabase
-      .from('reports')
-      .update(update)
-      .eq('id', params.id)
-    if (error) throw error
+    if (Object.keys(update).length > 1) {
+      const { error } = await supabase.from('reports').update(update).eq('id', params.id)
+      if (error) throw error
+    }
+    if (Array.isArray(body.activities)) {
+      for (const a of body.activities) {
+        const { error } = await supabase
+          .from('report_activities')
+          .update({ progress: a.progress })
+          .eq('report_id', params.id)
+          .eq('activity_id', a.activity_id)
+        if (error) throw error
+      }
+    }
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
