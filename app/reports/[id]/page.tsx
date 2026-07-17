@@ -116,7 +116,7 @@ export default function ReportPage() {
     })
   }, [id])
 
-  function saveDates() {
+  async function saveDates() {
     if (!report?.project_id) return
     const dates = {
       tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish,
@@ -124,13 +124,33 @@ export default function ReportPage() {
       constructionProceedNotice, constructionStart, constructionFinishEstimated,
       contractStart, contractFinish
     }
-    fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates }) }).catch(() => {})
+    try {
+      const res = await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Nu s-au putut salva datele pe server: ${err.error || res.status}. Datele NU sunt vizibile pe alte computere până nu se rezolvă.`)
+        return
+      }
+    } catch {
+      alert('Eroare de rețea la salvarea datelor. Verifică conexiunea și încearcă din nou.')
+      return
+    }
     setShowDates(false)
   }
 
-  function saveWeights() {
+  async function saveWeights() {
     if (!report?.project_id) return
-    fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).catch(() => {})
+    try {
+      const res = await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Nu s-au putut salva ponderile pe server: ${err.error || res.status}. Ponderile NU sunt vizibile pe alte computere până nu se rezolvă.`)
+        return
+      }
+    } catch {
+      alert('Eroare de rețea la salvarea ponderilor. Verifică conexiunea și încearcă din nou.')
+      return
+    }
     setEditingWeights(false)
   }
 
@@ -745,7 +765,7 @@ ${photosHtml}
     <div style={{ minHeight: '100vh', background: '#f5f5f3', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
 
       {/* STICKY HEADER */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+      <header className="s7-header-row" style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
           <div>
@@ -755,7 +775,7 @@ ${photosHtml}
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
           <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Progress Platform</span>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="s7-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
           <button onClick={() => setEditing(!editing)} style={btn('rgba(255,255,255,0.1)')}>✏️ Edit text</button>
           <button onClick={() => setEditingWeights(!editingWeights)} style={btn('rgba(255,255,255,0.1)')}>⚖️ Weights</button>
@@ -767,7 +787,7 @@ ${photosHtml}
         </div>
       </header>
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px' }}>
+      <main className="s7-main-pad" style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px' }}>
 
         {/* PROJECT DATES — collapsible */}
         {showDates && (
@@ -776,7 +796,7 @@ ${photosHtml}
               <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Project Dates</h2>
               <button onClick={saveDates} style={btn(BLUE)}>Save & Hide</button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {[
                 { title: 'TENDER', fields: [['Start', tenderStart, setTenderStart], ['Offers Received', tenderOffersReceived, setTenderOffersReceived], ['Offers Review', tenderOffersReview, setTenderOffersReview], ['Finish', tenderFinish, setTenderFinish]] },
                 { title: 'CONTRACTING', fields: [['Start', contractingStart, setContractingStart], ['Review Legal', contractingReviewLegal, setContractingReviewLegal], ['Finish', contractingFinish, setContractingFinish]] },
@@ -809,7 +829,7 @@ ${photosHtml}
                 <button onClick={saveWeights} style={btn(BLUE)}>Save weights</button>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+            <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
               {acts.map((a: any) => (
                 <div key={a.activity_id} style={{ background: '#f9fafb', borderRadius: 8, padding: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{a.activity?.name}</div>
@@ -837,7 +857,7 @@ ${photosHtml}
         )}
 
         {/* REPORT HEADER — pleasant blue instead of black */}
-        <div style={{ background: HEADER_BG, borderRadius: 12, padding: '20px 28px', color: '#fff', marginBottom: 20 }}>
+        <div className="s7-score-box" style={{ background: HEADER_BG, borderRadius: 12, padding: '20px 28px', color: '#fff', marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>{report.project?.name}</h1>
@@ -857,7 +877,7 @@ ${photosHtml}
                 </div>
               )}
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div className="s7-score-right" style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 40, fontWeight: 700 }}>{totalProgress.toFixed(2)}%</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>weighted progress</div>
               {weeklyProgress > 0 && <div style={{ fontSize: 13, color: ORANGE, fontWeight: 600, marginTop: 4 }}>+{weeklyProgress}% this week</div>}
@@ -869,7 +889,7 @@ ${photosHtml}
         </div>
 
         {/* 3 MINI CHARTS */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div className="s7-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
             { ref: tenderChartRef, total: tenderTotal, label: 'Tender' },
             { ref: contractingChartRef, total: contractingTotal, label: 'Contracting' },
@@ -907,10 +927,11 @@ ${photosHtml}
         {/* ACTIVITIES */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Activities Progress</h2>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {acts.map((a: any) => {
             const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
             return (
-              <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, minWidth: 560 }}>
                 <span style={{ width: 190, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
                 <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
                 <div style={{ flex: 1, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
@@ -923,6 +944,7 @@ ${photosHtml}
               </div>
             )
           })}
+          </div>
           {/* Weekly progress summary row */}
           <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>Weekly Progress (this period)</span>
@@ -931,7 +953,7 @@ ${photosHtml}
         </div>
 
         {/* TEXT SECTIONS */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div className="s7-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
             { label: '✓ Works completed', value: worksDone, setter: setWorksDone, color: '#065f46', key: 'done' },
             { label: '→ Works planned', value: worksPlanned, setter: setWorksPlanned, color: BLUE_DARK, key: 'planned' },
@@ -978,7 +1000,7 @@ ${photosHtml}
           </div>
           {photos.length > 0 && (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+              <div className="s7-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
                 {photos.map((p) => (
                   <div key={p.id} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
                     {p.url && !p.url.startsWith('data:text/plain') ? (
