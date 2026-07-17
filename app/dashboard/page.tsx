@@ -183,7 +183,7 @@ export default function DashboardPage() {
                                   : <span title="Has attachments" style={{ fontSize: 14 }}>📎</span>
                               })()}
                               <Link href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
-                              <Link href={`/reports/${r.id}/edit`} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
+                              <Link href={`/reports/${r.id}`} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
                               <button onClick={async () => { if(confirm('Delete this report?')) { await fetch(`/api/reports/${r.id}`, {method:'DELETE'}); setReports(prev => prev.filter(x => x.id !== r.id)) } }}
                                 style={{ ...btn('#fef2f2', '#dc2626'), padding: '5px 12px', fontSize: 12 }}>Delete</button>
                             </div>
