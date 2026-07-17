@@ -22,7 +22,7 @@ export default function ReportPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDates, setShowDates] = useState(false)
-  const [photos, setPhotos] = useState<string[]>([])
+  const [photos, setPhotos] = useState<{ id: string; url: string }[]>([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [editingWeights, setEditingWeights] = useState(false)
@@ -49,7 +49,7 @@ export default function ReportPage() {
   const chartInstances = useRef<any[]>([])
 
   useEffect(() => {
-    fetch(`/api/reports/${id}`).then(r => r.json()).then(data => {
+    fetch(`/api/reports/${id}`).then(r => r.json()).then(async data => {
       setReport(data)
       setWorksDone(data.works_done || '')
       setWorksPlanned(data.works_planned || '')
@@ -60,38 +60,77 @@ export default function ReportPage() {
         fetch(`/api/reports?project_id=${data.project_id}`)
           .then(r => r.json())
           .then(reports => setAllReports(Array.isArray(reports) ? reports.reverse() : []))
-        const saved = localStorage.getItem(`project_dates_${data.project_id}`)
-        if (saved) {
-          const d = JSON.parse(saved)
-          setTenderStart(d.tenderStart||''); setTenderOffersReceived(d.tenderOffersReceived||'')
-          setTenderOffersReview(d.tenderOffersReview||''); setTenderFinish(d.tenderFinish||'')
-          setContractingStart(d.contractingStart||''); setContractingReviewLegal(d.contractingReviewLegal||'')
-          setContractingFinish(d.contractingFinish||''); setConstructionProceedNotice(d.constructionProceedNotice||'')
-          setConstructionStart(d.constructionStart||''); setConstructionFinishEstimated(d.constructionFinishEstimated||'')
-          setContractStart(d.contractStart||''); setContractFinish(d.contractFinish||'')
-        }
-        const savedPhotos = localStorage.getItem(`report_photos_${id}`)
-        if (savedPhotos) setPhotos(JSON.parse(savedPhotos))
-        const savedWeights = localStorage.getItem(`project_weights_${data.project_id}`)
-        if (savedWeights) setWeights(JSON.parse(savedWeights))
+
+        // Dates & weights now live on the server (visible from any computer).
+        // If this browser has older data saved locally and the server has none yet,
+        // push it up automatically so nothing gets lost in the switch.
+        const legacyDates = localStorage.getItem(`project_dates_${data.project_id}`)
+        const legacyWeights = localStorage.getItem(`project_weights_${data.project_id}`)
+        try {
+          const settingsRes = await fetch(`/api/projects/${data.project_id}/settings`).then(r => r.json())
+          let d = settingsRes?.dates || {}
+          let w = settingsRes?.weights || {}
+          const isEmpty = (o: any) => !o || Object.keys(o).length === 0
+
+          if (isEmpty(d) && legacyDates) {
+            d = JSON.parse(legacyDates)
+            fetch(`/api/projects/${data.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates: d }) }).catch(() => {})
+          }
+          if (isEmpty(w) && legacyWeights) {
+            w = JSON.parse(legacyWeights)
+            fetch(`/api/projects/${data.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights: w }) }).catch(() => {})
+          }
+
+          setTenderStart(d.tenderStart || ''); setTenderOffersReceived(d.tenderOffersReceived || '')
+          setTenderOffersReview(d.tenderOffersReview || ''); setTenderFinish(d.tenderFinish || '')
+          setContractingStart(d.contractingStart || ''); setContractingReviewLegal(d.contractingReviewLegal || '')
+          setContractingFinish(d.contractingFinish || ''); setConstructionProceedNotice(d.constructionProceedNotice || '')
+          setConstructionStart(d.constructionStart || ''); setConstructionFinishEstimated(d.constructionFinishEstimated || '')
+          setContractStart(d.contractStart || ''); setContractFinish(d.contractFinish || '')
+          setWeights(w)
+        } catch {}
+
+        // Photos now live on the server too. Migrate any left over from this browser's
+        // localStorage (from before the switch) the first time this report is opened.
+        try {
+          const serverPhotos = await fetch(`/api/reports/${id}/photos`).then(r => r.json())
+          if (Array.isArray(serverPhotos) && serverPhotos.length) {
+            setPhotos(serverPhotos.map((p: any) => ({ id: p.id, url: p.url })))
+          } else {
+            const legacyPhotos = localStorage.getItem(`report_photos_${id}`)
+            if (legacyPhotos) {
+              const parsed = JSON.parse(legacyPhotos)
+              if (Array.isArray(parsed) && parsed.length) {
+                const uploaded = await fetch(`/api/reports/${id}/photos`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: parsed })
+                }).then(r => r.json())
+                if (Array.isArray(uploaded)) {
+                  setPhotos(uploaded.map((p: any) => ({ id: p.id, url: p.url })))
+                  localStorage.removeItem(`report_photos_${id}`)
+                }
+              }
+            }
+          }
+        } catch {}
       }
     })
   }, [id])
 
   function saveDates() {
     if (!report?.project_id) return
-    localStorage.setItem(`project_dates_${report.project_id}`, JSON.stringify({
+    const dates = {
       tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish,
       contractingStart, contractingReviewLegal, contractingFinish,
       constructionProceedNotice, constructionStart, constructionFinishEstimated,
       contractStart, contractFinish
-    }))
+    }
+    fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates }) }).catch(() => {})
     setShowDates(false)
   }
 
   function saveWeights() {
     if (!report?.project_id) return
-    localStorage.setItem(`project_weights_${report.project_id}`, JSON.stringify(weights))
+    fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).catch(() => {})
     setEditingWeights(false)
   }
 
@@ -289,38 +328,45 @@ export default function ReportPage() {
     } catch {
       // Continue to save whatever succeeded rather than losing everything
     }
-    const updated = [...photos, ...newPhotos]
-    setPhotos(updated)
     try {
-      localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
+      if (newPhotos.length) {
+        const uploaded = await fetch(`/api/reports/${id}/photos`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: newPhotos })
+        }).then(r => r.json())
+        if (Array.isArray(uploaded)) {
+          setPhotos(prev => [...prev, ...uploaded.map((p: any) => ({ id: p.id, url: p.url }))])
+        } else {
+          alert('A apărut o eroare la salvarea pozelor pe server. Încearcă din nou.')
+        }
+      }
     } catch {
-      alert('Nu mai există spațiu de stocare în acest browser pentru toate pozele. Pozele adăugate acum sunt vizibile, dar nu au putut fi salvate — șterge câteva poze mai vechi (sau folosește "🗑 Delete all photos") și încearcă din nou cu un set mai mic.')
+      alert('A apărut o eroare de rețea la salvarea pozelor. Verifică conexiunea și încearcă din nou.')
     }
     setUploadingPhoto(false)
     setPhotosJustSaved(false)
   }
 
+  // Photos are saved to the server as soon as they're uploaded — this just re-confirms/re-syncs
   function savePhotosNow() {
-    try {
-      localStorage.setItem(`report_photos_${id}`, JSON.stringify(photos))
+    fetch(`/api/reports/${id}/photos`).then(r => r.json()).then(data => {
+      if (Array.isArray(data)) setPhotos(data.map((p: any) => ({ id: p.id, url: p.url })))
       setPhotosJustSaved(true)
       setTimeout(() => setPhotosJustSaved(false), 2500)
-    } catch {
-      alert('Nu mai există spațiu de stocare în acest browser. Șterge câteva poze mai vechi și încearcă din nou.')
-    }
+    }).catch(() => alert('Nu am putut sincroniza cu serverul. Verifică conexiunea.'))
   }
 
   function deleteAllPhotos() {
     if (!confirm(`Delete all ${photos.length} photo(s)/attachment(s) from this report? This cannot be undone.`)) return
+    fetch(`/api/reports/${id}/photos`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      .catch(() => {})
     setPhotos([])
-    localStorage.setItem(`report_photos_${id}`, JSON.stringify([]))
     setPhotosJustSaved(false)
   }
 
-  function removePhoto(idx: number) {
-    const updated = photos.filter((_, i) => i !== idx)
-    setPhotos(updated)
-    localStorage.setItem(`report_photos_${id}`, JSON.stringify(updated))
+  function removePhoto(photoId: string) {
+    fetch(`/api/reports/${id}/photos`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId }) })
+      .catch(() => {})
+    setPhotos(prev => prev.filter(p => p.id !== photoId))
     setPhotosJustSaved(false)
   }
 
@@ -512,7 +558,7 @@ export default function ReportPage() {
     const contractingChartImg = contractingChartRef.current ? contractingChartRef.current.toDataURL('image/png', 1.0) : ''
     const constructionChartImg = constructionChartRef.current ? constructionChartRef.current.toDataURL('image/png', 1.0) : ''
 
-    const photoImgs = photos.filter(p => p.startsWith('data:image'))
+    const photoImgs = photos.filter(p => p.url && !p.url.startsWith('data:text/plain')).map(p => p.url)
     const chartIncluded = allReports.length >= 1 && !!mainChartImg
     const scoreColor = chartIncluded ? '#059669' : ORANGE
 
@@ -933,14 +979,14 @@ ${photosHtml}
           {photos.length > 0 && (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-                {photos.map((src, i) => (
-                  <div key={i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
-                    {src.startsWith('data:image') ? (
-                      <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {photos.map((p) => (
+                  <div key={p.id} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
+                    {p.url && !p.url.startsWith('data:text/plain') ? (
+                      <img src={p.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{src.replace('data:text/plain,', '')}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
                     )}
-                    <button onClick={() => removePhoto(i)}
+                    <button onClick={() => removePhoto(p.id)}
                       style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 99, width: 22, height: 22, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                   </div>
                 ))}
