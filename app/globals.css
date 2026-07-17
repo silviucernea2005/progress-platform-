@@ -5,6 +5,9 @@
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f9fafb; color: #111827; }
 
 /* Mobile responsiveness — inline styles set the desktop layout, these rules adapt it on small screens */
+/* Dashboard reports: table on desktop, card list on mobile (no horizontal scroll) */
+.s7-mobile-cards { display: none; }
+
 @media (max-width: 760px) {
   .s7-header-row { flex-wrap: wrap !important; row-gap: 10px !important; }
   .s7-header-actions { flex-wrap: wrap !important; justify-content: flex-start !important; row-gap: 6px !important; }
@@ -19,5 +22,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .s7-dash-body { flex-direction: column !important; }
   .s7-dash-sidebar { width: 100% !important; border-right: none !important; border-bottom: 1px solid #e5e7eb !important; max-height: 260px !important; }
   .s7-dash-projectlist { display: none !important; }
+  .s7-desktop-table { display: none !important; }
+  .s7-mobile-cards { display: block !important; }
 }
 
