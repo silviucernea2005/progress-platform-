@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { jwtVerify } from 'jose'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+async function requireAuth(req: NextRequest) {
+  const token = req.cookies.get('pp_session')?.value
+  if (!token) return null
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
+    const { payload } = await jwtVerify(token, secret)
+    return payload
+  } catch {
+    return null
+  }
+}
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabase
@@ -18,6 +31,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 // Body: { dates?: {...}, weights?: {...} } — only the keys provided get updated, the rest are preserved
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await requireAuth(req)
+  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
   try {
     const body = await req.json()
     const { data: existing } = await supabase.from('project_settings').select('*').eq('project_id', params.id).maybeSingle()
@@ -34,3 +49,4 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
