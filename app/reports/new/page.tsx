@@ -141,6 +141,12 @@ function NewReportForm() {
   }
 
   useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => {
+      if (!d.user) router.push(`/login?returnTo=${encodeURIComponent('/reports/new' + (projectId ? `?project=${projectId}` : ''))}`)
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : []))
   }, [])
 
