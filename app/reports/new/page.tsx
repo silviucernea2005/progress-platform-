@@ -144,21 +144,23 @@ function NewReportForm() {
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : []))
   }, [])
 
-  // Prefill from previous report
+  // Prefill activity progress from the project's most recent report — always, whenever a
+  // project is selected (not just when arriving from a specific "New Report" button/flow).
   useEffect(() => {
-    const pid = searchParams.get('project') || projectId
-    if (!pid) return
-    const prefill = localStorage.getItem(`prefill_report_${pid}`)
-    if (prefill && searchParams.get('prefill') === '1') {
-      const data = JSON.parse(prefill)
-      setProjectId(data.project_id || pid)
-      if (data.activities?.length) {
-        setActivities(ACTIVITIES.map(a => {
-          const found = data.activities.find((x: any) => x.activity_id === a.id)
-          return { ...a, progress: found ? found.progress : 0 }
-        }))
-      }
-    }
+    if (!projectId) return
+    fetch(`/api/reports?project_id=${projectId}`)
+      .then(r => r.json())
+      .then(list => {
+        if (!Array.isArray(list) || !list.length) return
+        const latest = list[0] // /api/reports already sorts by period_start descending
+        if (latest?.activities?.length) {
+          setActivities(prev => prev.map(a => {
+            const found = latest.activities.find((x: any) => x.activity_id === a.id)
+            return { ...a, progress: found ? found.progress : a.progress }
+          }))
+        }
+      })
+      .catch(() => {})
   }, [projectId])
 
   // Load the project's saved activity weights from the server (same weights used by the last edited report)
@@ -216,7 +218,6 @@ function NewReportForm() {
     })
     const data = await res.json()
     if (data.ok) {
-      localStorage.removeItem(`prefill_report_${projectId}`)
       if (photos.length) {
         await fetch(`/api/reports/${data.id}/photos`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos })
