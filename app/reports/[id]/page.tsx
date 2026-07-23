@@ -17,6 +17,8 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true)
   const [allReports, setAllReports] = useState<any[]>([])
   const [editing, setEditing] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [worksDone, setWorksDone] = useState('')
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
@@ -65,6 +67,24 @@ export default function ReportPage() {
   const chartInstances = useRef<any[]>([])
 
   useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => { setCurrentUser(d.user); setAuthChecked(true) }).catch(() => setAuthChecked(true))
+  }, [])
+
+  function requireLogin(): boolean {
+    if (currentUser) return true
+    if (confirm('Trebuie să te autentifici ca să poți edita. Mergi la pagina de login?')) {
+      router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)
+    }
+    return false
+  }
+
+  // Arriving from the dashboard's "Edit" link (?edit=1) — only auto-open editing if actually logged in
+  useEffect(() => {
+    if (!report || !authChecked) return
+    if (searchParams.get('edit') === '1' && currentUser) setEditing(true)
+  }, [report, authChecked, currentUser])
+
+  useEffect(() => {
     fetch(`/api/reports/${id}`).then(r => r.json()).then(async data => {
       setReport(data)
       setWorksDone(data.works_done || '')
@@ -74,7 +94,6 @@ export default function ReportPage() {
       setPeriodEnd(data.period_end || '')
       setActivityProgress(Object.fromEntries((data.activities || []).map((a: any) => [a.activity_id, a.progress])))
       setLoading(false)
-      if (searchParams.get('edit') === '1') setEditing(true)
       if (data.project_id) {
         localStorage.setItem('dashboard_selected_project', data.project_id)
         fetch(`/api/reports?project_id=${data.project_id}`)
@@ -956,23 +975,32 @@ ${photosHtml}
         <div className="s7-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
           <button onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
-          <button onClick={toggleFullEdit} style={btn(editing ? ORANGE : 'rgba(255,255,255,0.1)')}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+          <button onClick={() => { if (requireLogin()) toggleFullEdit() }} style={btn(editing ? ORANGE : 'rgba(255,255,255,0.1)')}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
             {showExportMenu && (
               <div onMouseLeave={() => setShowExportMenu(false)}
                 style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
-                <button onClick={() => { setShowExportMenu(false); exportWordClientSide() }}
+                <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportWordClientSide() }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📄 Word</button>
                 <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
-                <button onClick={() => { setShowExportMenu(false); exportExcel() }}
+                <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportExcel() }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📊 Excel</button>
               </div>
             )}
           </div>
-          <button onClick={handleNewReport} style={btn(ORANGE)}>+ New Report</button>
+          <button onClick={() => { if (requireLogin()) handleNewReport() }} style={btn(ORANGE)}>+ New Report</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
+          {authChecked && (
+            currentUser ? (
+              <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null); setEditing(false); setEditingWeights(false); setEditingPeriod(false) }}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 11 }}>{currentUser.name} · Logout</button>
+            ) : (
+              <button onClick={() => router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)}
+                style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 11, padding: '4px 10px' }}>Login</button>
+            )
+          )}
         </div>
       </header>
 
@@ -1338,3 +1366,4 @@ ${photosHtml}
     </div>
   )
 }
+
