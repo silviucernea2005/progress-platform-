@@ -18,11 +18,12 @@ export async function POST(req: NextRequest) {
     if (!valid) return NextResponse.json({ error: 'PIN incorect' }, { status: 401 })
     const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
     const token = await new SignJWT({ sub: user.id, name: user.name, email: user.email, role: user.role })
-      .setProtectedHeader({ alg: 'HS256' }).setExpirationTime('8h').sign(secret)
+      .setProtectedHeader({ alg: 'HS256' }).setExpirationTime('90d').sign(secret)
     const response = NextResponse.json({ ok: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
-    response.cookies.set('pp_session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 8, path: '/' })
+    response.cookies.set('pp_session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 90, path: '/' })
     return response
   } catch (e) {
     return NextResponse.json({ error: 'Eroare server' }, { status: 500 })
   }
 }
+
