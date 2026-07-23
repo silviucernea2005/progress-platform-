@@ -675,6 +675,38 @@ export default function ReportPage() {
   const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 } as any)
 
   // Client-side Excel export — Summary / Activities / Notes sheets
+  // Word export — captures the main chart (and mini charts, if visible) exactly like the browser
+  // renders them, and sends them to the server so they can be embedded in the .docx.
+  async function exportWordClientSide() {
+    const mainChartImage = mainChartRef.current ? mainChartRef.current.toDataURL('image/png', 1.0) : null
+    const miniChartImages = showMiniCharts ? [tenderChartRef, contractingChartRef, constructionChartRef]
+      .map(r => r.current ? r.current.toDataURL('image/png', 1.0) : null)
+      .filter(Boolean) : []
+
+    try {
+      const res = await fetch(`/api/reports/${id}/export-word`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mainChartImage, miniChartImages })
+      })
+      if (!res.ok) {
+        alert('Nu s-a putut genera documentul Word.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Raport_${report.project?.name}_${report.period_start}.docx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Eroare de rețea la generarea documentului Word.')
+    }
+  }
+
   async function exportExcel() {
     const XLSX = await import('xlsx')
 
@@ -930,8 +962,8 @@ ${photosHtml}
             {showExportMenu && (
               <div onMouseLeave={() => setShowExportMenu(false)}
                 style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
-                <a href={`/api/reports/${id}/export-word`} onClick={() => setShowExportMenu(false)}
-                  style={{ display: 'block', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, textDecoration: 'none' }}>📄 Word</a>
+                <button onClick={() => { setShowExportMenu(false); exportWordClientSide() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📄 Word</button>
                 <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
                 <button onClick={() => { setShowExportMenu(false); exportExcel() }}
