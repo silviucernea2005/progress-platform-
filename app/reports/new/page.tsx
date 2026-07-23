@@ -31,6 +31,114 @@ function NewReportForm() {
   const [activities, setActivities] = useState(ACTIVITIES.map(a => ({ ...a, progress: 0 })))
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+
+  useEffect(() => {
+    if ((window as any).pdfjsLib) return
+    const pdfScript = document.createElement('script')
+    pdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+    pdfScript.onload = () => {
+      ;(window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+    }
+    document.head.appendChild(pdfScript)
+  }, [])
+
+  // Resize/compress images before staging — keeps things fast and avoids huge uploads
+  function compressImage(dataUrl: string, maxWidth = 1400, quality = 0.72): Promise<string> {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        let { width, height } = img
+        if (width > maxWidth) { height = Math.round(height * (maxWidth / width)); width = maxWidth }
+        const canvas = document.createElement('canvas')
+        canvas.width = width; canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(dataUrl); return }
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => resolve(dataUrl)
+      img.src = dataUrl
+    })
+  }
+
+  // Extract embedded images from Office Open XML files (xlsx/docx are ZIP archives)
+  async function extractOfficeImages(file: File): Promise<string[]> {
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(file)
+    const mediaPrefix = /\.xlsx$/i.test(file.name) ? 'xl/media/' : 'word/media/'
+    const mediaEntries = Object.keys(zip.files)
+      .filter(name => name.startsWith(mediaPrefix) && !zip.files[name].dir)
+      .filter(name => /\.(png|jpe?g|gif|bmp)$/i.test(name))
+      .sort()
+    const images: string[] = []
+    for (const name of mediaEntries) {
+      const ext = name.split('.').pop()!.toLowerCase()
+      const mime = ext === 'jpg' ? 'jpeg' : ext
+      const base64 = await zip.files[name].async('base64')
+      images.push(`data:image/${mime};base64,${base64}`)
+    }
+    return images
+  }
+
+  async function handlePhotoDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (!files.length) return
+    setUploadingPhoto(true)
+    const newPhotos: string[] = []
+    try {
+      for (const file of files) {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader()
+          const dataUrl = await new Promise<string>((res, rej) => {
+            reader.onload = () => res(reader.result as string)
+            reader.onerror = () => rej(new Error('read failed'))
+            reader.readAsDataURL(file)
+          })
+          newPhotos.push(await compressImage(dataUrl))
+        } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+          const reader = new FileReader()
+          await new Promise<void>(res => {
+            reader.onload = async () => {
+              try {
+                const pdfjsLib = (window as any).pdfjsLib
+                if (pdfjsLib) {
+                  const pdf = await pdfjsLib.getDocument({ data: reader.result }).promise
+                  const numPages = pdf.numPages
+                  for (let p = 1; p <= Math.min(numPages, 10); p++) {
+                    const page = await pdf.getPage(p)
+                    const viewport = page.getViewport({ scale: 1.5 })
+                    const canvas = document.createElement('canvas')
+                    canvas.width = viewport.width
+                    canvas.height = viewport.height
+                    await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise
+                    newPhotos.push(await compressImage(canvas.toDataURL('image/jpeg', 0.85)))
+                  }
+                }
+              } catch {}
+              res()
+            }
+            reader.readAsArrayBuffer(file)
+          })
+        } else if (file.name.match(/\.(xlsx|docx)$/i)) {
+          try {
+            const images = await extractOfficeImages(file)
+            for (const img of images) newPhotos.push(await compressImage(img))
+          } catch {}
+        }
+      }
+    } catch {}
+    setPhotos(prev => [...prev, ...newPhotos])
+    setUploadingPhoto(false)
+  }
+
+  function removeStagedPhoto(index: number) {
+    setPhotos(prev => prev.filter((_, i) => i !== index))
+  }
 
   useEffect(() => {
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : []))
@@ -105,6 +213,11 @@ function NewReportForm() {
     const data = await res.json()
     if (data.ok) {
       localStorage.removeItem(`prefill_report_${projectId}`)
+      if (photos.length) {
+        await fetch(`/api/reports/${data.id}/photos`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos })
+        }).catch(() => {})
+      }
       router.push(`/reports/${data.id}`)
     } else alert('Error: ' + data.error)
     setSaving(false)
@@ -175,6 +288,37 @@ function NewReportForm() {
           ))}
         </div>
 
+        {/* Photos */}
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: MCORE_DARK }}>Site Photos & Attachments</h2>
+          {photos.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+              {photos.map((src, i) => (
+                <div key={i} style={{ position: 'relative', borderRadius: 8, overflow: 'hidden', aspectRatio: '4/3', background: '#f3f4f6' }}>
+                  <img src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button onClick={() => removeStagedPhoto(i)}
+                    style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 99, width: 22, height: 22, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handlePhotoDrop}
+            style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius: 10, padding: 24, textAlign: 'center', background: dragOver ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s', cursor: 'pointer' }}>
+            {uploadingPhoto ? (
+              <div style={{ color: BLUE, fontSize: 13 }}>Processing files...</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Works & Red Flags */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: MCORE_DARK }}>Works & Notes</h2>
@@ -216,3 +360,4 @@ export default function NewReportPage() {
     </Suspense>
   )
 }
+
