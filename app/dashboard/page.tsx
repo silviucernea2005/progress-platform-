@@ -14,6 +14,20 @@ export default function DashboardPage() {
   const [reports, setReports] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [currentUser, setCurrentUser] = useState<any>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me').then(r => r.json()).then(d => setCurrentUser(d.user)).catch(() => {})
+  }, [])
+
+  function requireLogin(): boolean {
+    if (currentUser) return true
+    if (confirm('Trebuie să te autentifici ca să poți edita sau șterge rapoarte. Mergi la pagina de login?')) {
+      router.push('/login?returnTo=/dashboard')
+    }
+    return false
+  }
+
 
   // Remember which project was last being worked on, so "back to dashboard" from a
   // report shows that project instead of resetting to "All Projects"
@@ -74,8 +88,15 @@ export default function DashboardPage() {
           <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
         <nav style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link href="/projects/new" style={{ color: 'rgba(255,255,255,0.65)', textDecoration: 'none', fontSize: 13 }}>+ New Project</Link>
-          <Link href="/reports/new" style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+          <Link href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ color: 'rgba(255,255,255,0.65)', textDecoration: 'none', fontSize: 13 }}>+ New Project</Link>
+          <Link href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+          {currentUser ? (
+            <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null) }}
+              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>{currentUser.name} · Logout</button>
+          ) : (
+            <button onClick={() => router.push('/login?returnTo=/dashboard')}
+              style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 11, padding: '4px 10px' }}>Login</button>
+          )}
         </nav>
       </header>
 
@@ -143,7 +164,7 @@ export default function DashboardPage() {
             <h2 style={{ fontSize: 15, fontWeight: 700, color: MCORE_DARK, margin: 0 }}>
               {selectedProject === 'all' ? 'All Reports' : `Reports — ${projects.find(p => p.id === selectedProject)?.name || ''}`}
             </h2>
-            <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+            <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
           </div>
 
           <div className="s7-table-wrap s7-desktop-table" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
@@ -183,8 +204,14 @@ export default function DashboardPage() {
                                   : <span title="Has attachments" style={{ fontSize: 14 }}>📎</span>
                               })()}
                               <Link href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
-                              <Link href={`/reports/${r.id}?edit=1`} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
-                              <button onClick={async () => { if(confirm('Delete this report?')) { await fetch(`/api/reports/${r.id}`, {method:'DELETE'}); setReports(prev => prev.filter(x => x.id !== r.id)) } }}
+                              <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
+                              <button onClick={async () => {
+                                if (!requireLogin()) return
+                                if (!confirm('Delete this report?')) return
+                                const res = await fetch(`/api/reports/${r.id}`, { method: 'DELETE' })
+                                if (res.ok) setReports(prev => prev.filter(x => x.id !== r.id))
+                                else alert('Nu s-a putut șterge raportul.')
+                              }}
                                 style={{ ...btn('#fef2f2', '#dc2626'), padding: '5px 12px', fontSize: 12 }}>Delete</button>
                             </div>
                           </td>
@@ -221,8 +248,14 @@ export default function DashboardPage() {
                         <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
-                        <Link href={`/reports/${r.id}?edit=1`} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
-                        <button onClick={async () => { if(confirm('Delete this report?')) { await fetch(`/api/reports/${r.id}`, {method:'DELETE'}); setReports(prev => prev.filter(x => x.id !== r.id)) } }}
+                        <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
+                        <button onClick={async () => {
+                          if (!requireLogin()) return
+                          if (!confirm('Delete this report?')) return
+                          const res = await fetch(`/api/reports/${r.id}`, { method: 'DELETE' })
+                          if (res.ok) setReports(prev => prev.filter(x => x.id !== r.id))
+                          else alert('Nu s-a putut șterge raportul.')
+                        }}
                           style={{ ...btn('#fef2f2', '#dc2626'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Delete</button>
                       </div>
                     </div>
@@ -234,3 +267,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+
