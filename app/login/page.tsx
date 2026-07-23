@@ -22,8 +22,7 @@ function LoginForm() {
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error); return }
-      const returnTo = searchParams.get('returnTo')
-      router.push(returnTo || '/dashboard')
+      router.push('/dashboard')
     } catch {
       setError('Eroare de retea')
     } finally {
