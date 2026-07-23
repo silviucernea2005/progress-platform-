@@ -30,8 +30,18 @@ function cell(text: string, opts: { bold?: boolean; color?: string; bg?: string;
   })
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+function dataUrlToBuffer(dataUrl: string): Buffer | null {
+  const match = dataUrl.match(/^data:image\/\w+;base64,(.+)$/)
+  if (!match) return null
+  return Buffer.from(match[1], 'base64')
+}
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const body = await req.json().catch(() => ({}))
+    const mainChartImage: string | null = body?.mainChartImage || null
+    const miniChartImages: string[] = Array.isArray(body?.miniChartImages) ? body.miniChartImages : []
+
     const { data: report, error } = await supabase
       .from('reports')
       .select('*, project:projects(id,name,location,client), activities:report_activities(*, activity:activities(*))')
@@ -127,10 +137,38 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       }),
       new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: 'ACTIVITIES PROGRESS', bold: true, size: 22, font: 'Arial' })] }),
       activitiesTable,
+    ]
+
+    // Main "Works Progress" chart, captured client-side (canvas.toDataURL) and sent in the request
+    if (mainChartImage) {
+      const buf = dataUrlToBuffer(mainChartImage)
+      if (buf) {
+        children.push(new Paragraph({ spacing: { before: 300, after: 100 }, children: [new TextRun({ text: `WORKS PROGRESS · ${report.project?.name || ''}`, bold: true, size: 22, font: 'Arial' })] }))
+        children.push(new Paragraph({ children: [new ImageRun({ data: buf, transformation: { width: 600, height: 260 }, type: 'png' } as any)] }))
+      }
+    }
+
+    // Mini charts (Tender/Contracting/Construction Days), same source images as the PDF export
+    const miniBuffers = miniChartImages.map(dataUrlToBuffer).filter(Boolean) as Buffer[]
+    if (miniBuffers.length) {
+      const miniRow = new TableRow({
+        children: miniBuffers.map(buf => new TableCell({
+          margins: { top: 60, bottom: 60, left: 40, right: 40 },
+          children: [new Paragraph({ children: [new ImageRun({ data: buf, transformation: { width: 175, height: 105 }, type: 'png' } as any)] })]
+        }))
+      })
+      children.push(new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: { top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }, insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } },
+        rows: [miniRow]
+      }))
+    }
+
+    children.push(
       ...notesSection('✓ WORKS COMPLETED', '166534', report.works_done),
       ...notesSection('→ WORKS PLANNED', '1E40AF', report.works_planned),
       ...notesSection('🚩 RED FLAGS', '991B1B', report.red_flags),
-    ]
+    )
 
     if (photoRowsEls.length) {
       children.push(new Paragraph({ spacing: { before: 300, after: 100 }, children: [new TextRun({ text: 'SITE PHOTOS', bold: true, size: 22, font: 'Arial' })] }))
@@ -150,3 +188,4 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
