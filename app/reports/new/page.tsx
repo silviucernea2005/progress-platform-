@@ -161,14 +161,18 @@ function NewReportForm() {
     }
   }, [projectId])
 
-  // Load custom weights for selected project
+  // Load the project's saved activity weights from the server (same weights used by the last edited report)
   useEffect(() => {
     if (!projectId) return
-    const savedWeights = localStorage.getItem(`project_weights_${projectId}`)
-    if (savedWeights) {
-      const w = JSON.parse(savedWeights)
-      setActivities(prev => prev.map(a => ({ ...a, weight: w[a.id] !== undefined ? w[a.id] : a.weight })))
-    }
+    fetch(`/api/projects/${projectId}/settings`)
+      .then(r => r.json())
+      .then(data => {
+        const w = data?.weights || {}
+        if (Object.keys(w).length) {
+          setActivities(prev => prev.map(a => ({ ...a, weight: w[a.id] !== undefined ? w[a.id] : a.weight })))
+        }
+      })
+      .catch(() => {})
   }, [projectId])
 
   const totalProgress = activities.reduce((s, a) => s + a.progress * a.weight / 100, 0)
