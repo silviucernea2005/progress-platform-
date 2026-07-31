@@ -18,6 +18,39 @@ export default function NewProjectPage() {
   const [newCatWeight, setNewCatWeight] = useState<number>(0)
   const [addingCat, setAddingCat] = useState(false)
   const [savingWeights, setSavingWeights] = useState(false)
+  const [existingProjects, setExistingProjects] = useState<any[]>([])
+  const [similarWarning, setSimilarWarning] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/projects').then(r => r.json()).then(d => setExistingProjects(Array.isArray(d) ? d : [])).catch(() => {})
+  }, [])
+
+  function levenshtein(a: string, b: string): number {
+    const m = a.length, n = b.length
+    const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)])
+    for (let j = 0; j <= n; j++) dp[0][j] = j
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+      }
+    }
+    return dp[m][n]
+  }
+
+  function findSimilarProject(candidateName: string): string | null {
+    const norm = candidateName.trim().toLowerCase()
+    if (!norm) return null
+    for (const p of existingProjects) {
+      const pNorm = (p.name || '').trim().toLowerCase()
+      if (!pNorm) continue
+      if (pNorm === norm) return p.name
+      if (pNorm.includes(norm) || norm.includes(pNorm)) return p.name
+      const dist = levenshtein(norm, pNorm)
+      const maxLen = Math.max(norm.length, pNorm.length)
+      if (maxLen > 0 && dist / maxLen < 0.25) return p.name
+    }
+    return null
+  }
 
   useEffect(() => {
     if (!projectId) return
@@ -33,8 +66,16 @@ export default function NewProjectPage() {
     })
   }, [projectId])
 
-  async function handleCreateProject() {
+  async function handleCreateProject(skipCheck = false) {
     if (!name) return alert('Numele proiectului este obligatoriu')
+    if (!skipCheck) {
+      const similar = findSimilarProject(name)
+      if (similar) {
+        setSimilarWarning(similar)
+        return
+      }
+    }
+    setSimilarWarning(null)
     setSaving(true)
     const res = await fetch('/api/projects', {
       method: 'POST',
@@ -92,7 +133,7 @@ export default function NewProjectPage() {
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20, opacity: projectId ? 0.6 : 1 }}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Nume proiect *</label>
-            <input value={name} onChange={e => setName(e.target.value)} disabled={!!projectId} style={inputStyle} placeholder="Ex: Bocsa Retail Park" />
+            <input value={name} onChange={e => { setName(e.target.value); setSimilarWarning(null) }} disabled={!!projectId} style={inputStyle} placeholder="Ex: Bocsa Retail Park" />
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Locatie</label>
@@ -102,10 +143,23 @@ export default function NewProjectPage() {
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Client</label>
             <input value={client} onChange={e => setClient(e.target.value)} disabled={!!projectId} style={inputStyle} placeholder="Ex: Lidl Romania" />
           </div>
+
+          {similarWarning && !projectId && (
+            <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+              ⚠️ Există deja un proiect cu un nume identic sau similar: <strong>"{similarWarning}"</strong>. Sigur vrei să creezi un proiect nou, separat?
+              <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                <button onClick={() => { setSimilarWarning(null); handleCreateProject(true) }}
+                  style={{ padding: '6px 14px', background: '#92400e', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Continuă totuși</button>
+                <button onClick={() => setSimilarWarning(null)}
+                  style={{ padding: '6px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Anulează</button>
+              </div>
+            </div>
+          )}
+
           {!projectId && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
               <button onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Anuleaza</button>
-              <button onClick={handleCreateProject} disabled={saving} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <button onClick={() => handleCreateProject()} disabled={saving} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
                 {saving ? 'Se salveaza...' : 'Continua →'}
               </button>
             </div>
