@@ -23,8 +23,10 @@ async function requireAuth(req: NextRequest) {
 // project can edit/delete it — everyone else is view/export only.
 async function canEditProject(user: any, projectId: string): Promise<boolean> {
   if (user.role === 'admin') return true
-  const { data } = await supabase.from('projects').select('created_by').eq('id', projectId).maybeSingle()
-  return !!data && data.created_by === user.sub
+  const { data: project } = await supabase.from('projects').select('created_by').eq('id', projectId).maybeSingle()
+  if (project?.created_by === user.sub) return true
+  const { data: editor } = await supabase.from('project_editors').select('user_id').eq('project_id', projectId).eq('user_id', user.sub).maybeSingle()
+  return !!editor
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
