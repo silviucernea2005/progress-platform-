@@ -47,9 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       for (const a of body.activities) {
         const { error } = await supabase
           .from('report_activities')
-          .update({ progress: a.progress })
-          .eq('report_id', params.id)
-          .eq('activity_id', a.activity_id)
+          .upsert({ report_id: params.id, activity_id: a.activity_id, progress: a.progress }, { onConflict: 'report_id,activity_id' })
         if (error) throw error
       }
     }
@@ -70,4 +68,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
