@@ -180,7 +180,8 @@ export default function NewProjectPage() {
                 <div key={a.id} style={{ background: '#f9fafb', borderRadius: 8, padding: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 500, color: '#111827', marginBottom: 6 }}>{a.name}{a.project_id && <span style={{ color: BLUE, marginLeft: 6, fontSize: 10 }}>(custom)</span>}</div>
                   <input type="number" min={0} max={100} value={weights[a.id] ?? a.default_weight}
-                    onChange={e => setWeights(prev => ({ ...prev, [a.id]: Number(e.target.value) }))}
+                    onChange={e => setWeights(prev => ({ ...prev, [a.id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                    onFocus={e => e.target.select()}
                     style={{ ...inputStyle, textAlign: 'center', fontWeight: 600 }} />
                 </div>
               ))}
@@ -190,7 +191,9 @@ export default function NewProjectPage() {
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>+ Adauga categorie noua</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie (ex: Fatade sticla)" style={{ ...inputStyle, flex: 2 }} />
-                <input type="number" min={0} max={100} value={newCatWeight} onChange={e => setNewCatWeight(Number(e.target.value))} placeholder="%" style={{ ...inputStyle, flex: 1, textAlign: 'center' }} />
+                <input type="number" min={0} max={100} value={newCatWeight}
+                  onChange={e => setNewCatWeight(Math.min(100, Math.max(0, Number(e.target.value))))}
+                  onFocus={e => e.target.select()} placeholder="%" style={{ ...inputStyle, flex: 1, textAlign: 'center' }} />
                 <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()} style={{ padding: '9px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {addingCat ? '...' : '+ Adauga'}
                 </button>
