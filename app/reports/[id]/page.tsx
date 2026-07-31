@@ -38,7 +38,12 @@ export default function ReportPage() {
   const [savingPeriod, setSavingPeriod] = useState(false)
   const [periodError, setPeriodError] = useState('')
   const [activityProgress, setActivityProgress] = useState<Record<number, number>>({})
+  const [customActivities, setCustomActivities] = useState<any[]>([])
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatWeight, setNewCatWeight] = useState<number>(0)
+  const [addingCat, setAddingCat] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showMiniCharts, setShowMiniCharts] = useState(true)
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
@@ -203,6 +208,29 @@ export default function ReportPage() {
     setEditingPeriod(turningOn)
   }
 
+  async function handleAddCategory() {
+    if (!newCatName.trim() || !report?.project_id) return
+    setAddingCat(true)
+    try {
+      const res = await fetch('/api/activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCatName.trim(), default_weight: newCatWeight, project_id: report.project_id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setCustomActivities(prev => [...prev, data.activity])
+        setWeights(prev => ({ ...prev, [data.activity.id]: newCatWeight }))
+        setActivityProgress(prev => ({ ...prev, [data.activity.id]: 0 }))
+        setNewCatName('')
+        setNewCatWeight(0)
+      } else alert('Eroare: ' + data.error)
+    } catch {
+      alert('Eroare de rețea.')
+    }
+    setAddingCat(false)
+  }
+
   async function saveAllEdits() {
     setPeriodError('')
     if (periodStart && periodEnd && periodStart > periodEnd) {
@@ -218,7 +246,10 @@ export default function ReportPage() {
         body: JSON.stringify({
           period_start: periodStart, period_end: periodEnd,
           works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags,
-          activities: acts.map((a: any) => ({ activity_id: a.activity_id, progress: activityProgress[a.activity_id] ?? a.progress }))
+          activities: [
+            ...acts.map((a: any) => ({ activity_id: a.activity_id, progress: activityProgress[a.activity_id] ?? a.progress })),
+            ...customActivities.map((ca: any) => ({ activity_id: ca.id, progress: activityProgress[ca.id] ?? 0 })),
+          ]
         })
       })
       if (!res.ok) {
@@ -230,11 +261,13 @@ export default function ReportPage() {
       if (report?.project_id) {
         await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).catch(() => {})
       }
+      const newRows = customActivities.map((ca: any) => ({ activity_id: ca.id, progress: activityProgress[ca.id] ?? 0, activity: ca }))
       setReport((r: any) => ({
         ...r, period_start: periodStart, period_end: periodEnd,
         works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags,
-        activities: (r.activities || []).map((a: any) => ({ ...a, progress: activityProgress[a.activity_id] ?? a.progress }))
+        activities: [...(r.activities || []).map((a: any) => ({ ...a, progress: activityProgress[a.activity_id] ?? a.progress })), ...newRows]
       }))
+      setCustomActivities([])
       setEditing(false); setEditingWeights(false); setEditingPeriod(false)
     } catch {
       setPeriodError('Eroare de rețea. Verifică conexiunea și încearcă din nou.')
@@ -972,7 +1005,9 @@ ${photosHtml}
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
           <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Progress Platform</span>
         </div>
-        <div className="s7-header-actions" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
+        <div className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
           <button onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
           <button onClick={() => { if (requireLogin()) toggleFullEdit() }} style={btn(editing ? ORANGE : 'rgba(255,255,255,0.1)')}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
@@ -1077,6 +1112,24 @@ ${photosHtml}
                   <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'center' }}>Default: {a.activity?.default_weight}%</div>
                 </div>
               ))}
+              {customActivities.map((ca: any) => (
+                <div key={ca.id} style={{ background: '#eff6ff', borderRadius: 8, padding: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(nou)</span></div>
+                  <input type="number" min={0} max={100} value={weights[ca.id] ?? 0}
+                    onChange={e => setWeights(prev => ({ ...prev, [ca.id]: Number(e.target.value) }))}
+                    style={{ ...inp, textAlign: 'center', fontWeight: 600, fontSize: 14 }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 14, marginTop: 14 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 8 }}>+ Adauga categorie noua</label>
+              <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
+                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie" style={{ ...inp, flex: 2 }} />
+                <input type="number" min={0} max={100} value={newCatWeight} onChange={e => setNewCatWeight(Number(e.target.value))} placeholder="%" style={{ ...inp, width: 70, textAlign: 'center' }} />
+                <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()} style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {addingCat ? '...' : '+ Adauga'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1182,6 +1235,25 @@ ${photosHtml}
                 ) : (
                   <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
                 )}
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: displayProgress === 0 ? '#f3f4f6' : displayProgress < 100 ? '#dbeafe' : '#dcfce7', color: displayProgress === 0 ? '#6b7280' : displayProgress < 100 ? '#1e40af' : '#166534' }}>
+                  {displayProgress === 0 ? 'Not started' : displayProgress < 100 ? 'In progress' : 'Completed'}
+                </span>
+              </div>
+            )
+          })}
+          {editing && customActivities.map((ca: any) => {
+            const w = weights[ca.id] ?? 0
+            const displayProgress = activityProgress[ca.id] ?? 0
+            return (
+              <div key={ca.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
+                <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(nou)</span></span>
+                <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
+                <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
+                </div>
+                <input type="number" min={0} max={100} value={displayProgress}
+                  onChange={e => setActivityProgress(prev => ({ ...prev, [ca.id]: Number(e.target.value) }))}
+                  style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: displayProgress === 0 ? '#f3f4f6' : displayProgress < 100 ? '#dbeafe' : '#dcfce7', color: displayProgress === 0 ? '#6b7280' : displayProgress < 100 ? '#1e40af' : '#166534' }}>
                   {displayProgress === 0 ? 'Not started' : displayProgress < 100 ? 'In progress' : 'Completed'}
                 </span>
@@ -1366,4 +1438,5 @@ ${photosHtml}
     </div>
   )
 }
+
 
