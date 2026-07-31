@@ -16,6 +16,43 @@ export default function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showAccessPanel, setShowAccessPanel] = useState(false)
+  const [allUsers, setAllUsers] = useState<any[]>([])
+  const [projectEditorIds, setProjectEditorIds] = useState<Set<string>>(new Set())
+  const [loadingAccess, setLoadingAccess] = useState(false)
+
+  async function openAccessPanel() {
+    setShowAccessPanel(true)
+    setLoadingAccess(true)
+    try {
+      const [usersRes, editorsRes] = await Promise.all([
+        fetch('/api/users').then(r => r.json()),
+        fetch(`/api/projects/${selectedProject}/editors`).then(r => r.json()),
+      ])
+      setAllUsers(Array.isArray(usersRes) ? usersRes : [])
+      setProjectEditorIds(new Set(Array.isArray(editorsRes) ? editorsRes.map((e: any) => e.user_id) : []))
+    } catch {
+      alert('Nu s-a putut încărca lista de acces.')
+    }
+    setLoadingAccess(false)
+  }
+
+  async function toggleEditor(userId: string, isEditor: boolean) {
+    const method = isEditor ? 'DELETE' : 'POST'
+    const res = await fetch(`/api/projects/${selectedProject}/editors`, {
+      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }),
+    })
+    if (res.ok) {
+      setProjectEditorIds(prev => {
+        const next = new Set(prev)
+        if (isEditor) next.delete(userId); else next.add(userId)
+        return next
+      })
+    } else {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || 'Eroare la actualizarea accesului.')
+    }
+  }
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => setCurrentUser(d.user)).catch(() => {})
@@ -180,8 +217,41 @@ export default function DashboardPage() {
             <h2 style={{ fontSize: 15, fontWeight: 700, color: MCORE_DARK, margin: 0 }}>
               {selectedProject === 'all' ? 'All Reports' : `Reports — ${projects.find(p => p.id === selectedProject)?.name || ''}`}
             </h2>
-            <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {currentUser?.role === 'admin' && selectedProject !== 'all' && (
+                <button onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
+              )}
+              <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+            </div>
           </div>
+
+          {showAccessPanel && (
+            <div onClick={() => setShowAccessPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>Acces — {projects.find(p => p.id === selectedProject)?.name}</h3>
+                  <button onClick={() => setShowAccessPanel(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
+                </div>
+                {loadingAccess ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Se încarcă...</div> : (
+                  <>
+                    <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Bifează utilizatorii care pot edita acest proiect. Creatorul proiectului și adminii au acces automat.</p>
+                    {allUsers.map(u => {
+                      const isEditor = projectEditorIds.has(u.id)
+                      return (
+                        <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={isEditor} onChange={() => toggleEditor(u.id, isEditor)} />
+                          <div>
+                            <div style={{ fontSize: 13, color: MCORE_DARK }}>{u.name} {u.role === 'admin' && <span style={{ color: ORANGE, fontSize: 11 }}>(admin)</span>}</div>
+                            <div style={{ fontSize: 11, color: '#9ca3af' }}>{u.email}</div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="s7-table-wrap s7-desktop-table" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
