@@ -24,7 +24,9 @@ async function canEditReport(user: any, reportId: string): Promise<boolean> {
   const { data: report } = await supabase.from('reports').select('project_id').eq('id', reportId).maybeSingle()
   if (!report) return false
   const { data: project } = await supabase.from('projects').select('created_by').eq('id', report.project_id).maybeSingle()
-  return !!project && project.created_by === user.sub
+  if (project?.created_by === user.sub) return true
+  const { data: editor } = await supabase.from('project_editors').select('user_id').eq('project_id', report.project_id).eq('user_id', user.sub).maybeSingle()
+  return !!editor
 }
 
 // List all photos/attachments for a report
