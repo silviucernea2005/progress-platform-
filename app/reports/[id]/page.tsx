@@ -279,8 +279,19 @@ export default function ReportPage() {
   async function deleteReport() {
     if (!confirm('Delete this report? This cannot be undone.')) return
     setDeleting(true)
-    await fetch(`/api/reports/${id}`, { method: 'DELETE' })
-    router.push('/dashboard')
+    try {
+      const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'Nu s-a putut șterge raportul.')
+        setDeleting(false)
+        return
+      }
+      router.push('/dashboard')
+    } catch {
+      alert('Eroare de rețea.')
+      setDeleting(false)
+    }
   }
 
   function daysBetween(a: string, b: string) {
@@ -1026,6 +1037,7 @@ ${photosHtml}
             )}
           </div>
           <button onClick={() => { if (requireLogin()) handleNewReport() }} style={btn(ORANGE)}>+ New Report</button>
+          <button onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={btn('#dc2626')}>🗑 Delete</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
           {authChecked && (
             currentUser ? (
