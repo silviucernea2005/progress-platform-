@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
   try {
     const body = await req.json()
-    const { data, error } = await supabase.from('projects').insert(body).select().single()
+    const { data, error } = await supabase.from('projects').insert({ ...body, created_by: user.sub }).select().single()
     if (error) throw error
     return NextResponse.json({ ok: true, data, id: data.id })
   } catch (e: any) {
