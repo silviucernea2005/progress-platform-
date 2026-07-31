@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => setCurrentUser(d.user)).catch(() => {})
@@ -77,7 +78,7 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
       {/* HEADER */}
-      <header className="s7-header-row" style={{ background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <header className="s7-header-row" style={{ position: 'relative', background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ background: BLUE, borderRadius: 8, padding: '4px 10px', fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>S7</div>
           <div>
@@ -87,7 +88,9 @@ export default function DashboardPage() {
           <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
           <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
-        <nav style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
+        <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <Link href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ color: 'rgba(255,255,255,0.65)', textDecoration: 'none', fontSize: 13 }}>+ New Project</Link>
           <Link href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
           {currentUser ? (
@@ -267,4 +270,5 @@ export default function DashboardPage() {
     </div>
   )
 }
+
 
