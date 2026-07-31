@@ -4,13 +4,35 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f9fafb; color: #111827; }
 
+/* Prevent the whole page from scrolling sideways on phones, regardless of which
+   element would otherwise overflow (canvases, wide rows, etc.) */
+html, body { overflow-x: hidden; max-width: 100%; }
+canvas { max-width: 100% !important; }
+img { max-width: 100%; }
+
 /* Mobile responsiveness — inline styles set the desktop layout, these rules adapt it on small screens */
 /* Dashboard reports: table on desktop, card list on mobile (no horizontal scroll) */
 .s7-mobile-cards { display: none; }
+.s7-mobile-menu-btn { display: none; }
 
 @media (max-width: 760px) {
   .s7-header-row { flex-wrap: wrap !important; row-gap: 10px !important; }
-  .s7-header-actions { flex-wrap: wrap !important; justify-content: flex-start !important; row-gap: 6px !important; }
+  .s7-mobile-menu-btn { display: flex !important; align-items: center; justify-content: center; }
+  .s7-header-actions { display: none !important; }
+  .s7-header-actions.s7-mobile-open {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #1A1A2A;
+    padding: 10px;
+    z-index: 300;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+  }
+  .s7-header-actions.s7-mobile-open > * { width: 100% !important; justify-content: flex-start !important; text-align: left !important; }
   .s7-score-box { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
   .s7-score-box .s7-score-right { align-self: stretch !important; text-align: left !important; }
   .s7-grid-2, .s7-grid-3, .s7-grid-4 { grid-template-columns: 1fr !important; }
@@ -25,4 +47,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .s7-desktop-table { display: none !important; }
   .s7-mobile-cards { display: block !important; }
 }
+
 
