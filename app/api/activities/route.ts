@@ -19,6 +19,12 @@ async function requireAuth(req: NextRequest) {
   }
 }
 
+async function canEditProject(user: any, projectId: string): Promise<boolean> {
+  if (user.role === 'admin') return true
+  const { data } = await supabase.from('projects').select('created_by').eq('id', projectId).maybeSingle()
+  return !!data && data.created_by === user.sub
+}
+
 // Returns the 8 standard activities (project_id is null) plus any custom
 // activities created specifically for the given project.
 export async function GET(req: NextRequest) {
@@ -44,6 +50,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     if (!body.name || !body.project_id) return NextResponse.json({ error: 'name si project_id sunt obligatorii' }, { status: 400 })
+    if (!(await canEditProject(user, body.project_id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
 
     const { data: existing } = await supabase.from('activities').select('sort_order').order('sort_order', { ascending: false }).limit(1)
     const nextSortOrder = (existing?.[0]?.sort_order || 0) + 1
