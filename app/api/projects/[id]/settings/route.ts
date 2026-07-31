@@ -19,6 +19,12 @@ async function requireAuth(req: NextRequest) {
   }
 }
 
+async function canEditProject(user: any, projectId: string): Promise<boolean> {
+  if (user.role === 'admin') return true
+  const { data } = await supabase.from('projects').select('created_by').eq('id', projectId).maybeSingle()
+  return !!data && data.created_by === user.sub
+}
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabase
     .from('project_settings')
@@ -33,6 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!(await canEditProject(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
   try {
     const body = await req.json()
     const { data: existing } = await supabase.from('project_settings').select('*').eq('project_id', params.id).maybeSingle()
@@ -49,4 +56,5 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
