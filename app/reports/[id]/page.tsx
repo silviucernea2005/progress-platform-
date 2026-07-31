@@ -42,6 +42,7 @@ export default function ReportPage() {
   const [newCatName, setNewCatName] = useState('')
   const [newCatWeight, setNewCatWeight] = useState<number>(0)
   const [addingCat, setAddingCat] = useState(false)
+  const [showWeights, setShowWeights] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showMiniCharts, setShowMiniCharts] = useState(true)
@@ -1119,7 +1120,8 @@ ${photosHtml}
                 <div key={a.activity_id} style={{ background: '#f9fafb', borderRadius: 8, padding: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{a.activity?.name}</div>
                   <input type="number" min={0} max={100} value={weights[a.activity_id] ?? a.activity?.default_weight ?? 0}
-                    onChange={e => setWeights(prev => ({ ...prev, [a.activity_id]: Number(e.target.value) }))}
+                    onChange={e => setWeights(prev => ({ ...prev, [a.activity_id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                    onFocus={e => e.target.select()}
                     style={{ ...inp, textAlign: 'center', fontWeight: 600, fontSize: 14 }} />
                   <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4, textAlign: 'center' }}>Default: {a.activity?.default_weight}%</div>
                 </div>
@@ -1128,7 +1130,8 @@ ${photosHtml}
                 <div key={ca.id} style={{ background: '#eff6ff', borderRadius: 8, padding: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(nou)</span></div>
                   <input type="number" min={0} max={100} value={weights[ca.id] ?? 0}
-                    onChange={e => setWeights(prev => ({ ...prev, [ca.id]: Number(e.target.value) }))}
+                    onChange={e => setWeights(prev => ({ ...prev, [ca.id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                    onFocus={e => e.target.select()}
                     style={{ ...inp, textAlign: 'center', fontWeight: 600, fontSize: 14 }} />
                 </div>
               ))}
@@ -1137,7 +1140,9 @@ ${photosHtml}
               <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 8 }}>+ Adauga categorie noua</label>
               <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
                 <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie" style={{ ...inp, flex: 2 }} />
-                <input type="number" min={0} max={100} value={newCatWeight} onChange={e => setNewCatWeight(Number(e.target.value))} placeholder="%" style={{ ...inp, width: 70, textAlign: 'center' }} />
+                <input type="number" min={0} max={100} value={newCatWeight}
+                  onChange={e => setNewCatWeight(Math.min(100, Math.max(0, Number(e.target.value))))}
+                  onFocus={e => e.target.select()} placeholder="%" style={{ ...inp, width: 70, textAlign: 'center' }} />
                 <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()} style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                   {addingCat ? '...' : '+ Adauga'}
                 </button>
@@ -1229,20 +1234,27 @@ ${photosHtml}
 
         {/* ACTIVITIES */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Activities Progress</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Activities Progress</h2>
+            <button onClick={() => setShowWeights(!showWeights)}
+              style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+              {showWeights ? 'Ascunde ponderi' : 'Arata ponderi'}
+            </button>
+          </div>
           {acts.map((a: any) => {
             const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
             const displayProgress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
             return (
               <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
                 <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
-                <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
+                {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
                 <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
                   <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
                 </div>
                 {editing ? (
                   <input type="number" min={0} max={100} value={activityProgress[a.activity_id] ?? a.progress}
-                    onChange={e => setActivityProgress(prev => ({ ...prev, [a.activity_id]: Number(e.target.value) }))}
+                    onChange={e => setActivityProgress(prev => ({ ...prev, [a.activity_id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                    onFocus={e => e.target.select()}
                     style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
                 ) : (
                   <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
@@ -1259,12 +1271,13 @@ ${photosHtml}
             return (
               <div key={ca.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
                 <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(nou)</span></span>
-                <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>
+                {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
                 <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
                   <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
                 </div>
                 <input type="number" min={0} max={100} value={displayProgress}
-                  onChange={e => setActivityProgress(prev => ({ ...prev, [ca.id]: Number(e.target.value) }))}
+                  onChange={e => setActivityProgress(prev => ({ ...prev, [ca.id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                  onFocus={e => e.target.select()}
                   style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: displayProgress === 0 ? '#f3f4f6' : displayProgress < 100 ? '#dbeafe' : '#dcfce7', color: displayProgress === 0 ? '#6b7280' : displayProgress < 100 ? '#1e40af' : '#166534' }}>
                   {displayProgress === 0 ? 'Not started' : displayProgress < 100 ? 'In progress' : 'Completed'}
