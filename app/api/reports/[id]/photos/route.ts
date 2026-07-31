@@ -19,6 +19,14 @@ async function requireAuth(req: NextRequest) {
   }
 }
 
+async function canEditReport(user: any, reportId: string): Promise<boolean> {
+  if (user.role === 'admin') return true
+  const { data: report } = await supabase.from('reports').select('project_id').eq('id', reportId).maybeSingle()
+  if (!report) return false
+  const { data: project } = await supabase.from('projects').select('created_by').eq('id', report.project_id).maybeSingle()
+  return !!project && project.created_by === user.sub
+}
+
 // List all photos/attachments for a report
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabase
@@ -35,6 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
   try {
     const { photos } = await req.json()
     if (!Array.isArray(photos) || !photos.length) return NextResponse.json({ error: 'No photos provided' }, { status: 400 })
@@ -79,6 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
   try {
     const { order } = await req.json()
     if (!Array.isArray(order) || !order.length) return NextResponse.json({ error: 'order must be a non-empty array' }, { status: 400 })
@@ -98,6 +108,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
   try {
     const body = await req.json().catch(() => ({} as any))
 
@@ -117,4 +128,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
