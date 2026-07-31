@@ -19,6 +19,12 @@ async function requireAuth(req: NextRequest) {
   }
 }
 
+async function canEditProject(user: any, projectId: string): Promise<boolean> {
+  if (user.role === 'admin') return true
+  const { data } = await supabase.from('projects').select('created_by').eq('id', projectId).maybeSingle()
+  return !!data && data.created_by === user.sub
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const projectId = searchParams.get('project_id')
@@ -35,7 +41,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { activities, payments, weekly, created_by, ...reportData } = body
-    const { data: report, error: rErr } = await supabase.from('reports').insert({ ...reportData, created_by }).select().single()
+    if (!reportData.project_id) return NextResponse.json({ error: 'project_id este obligatoriu' }, { status: 400 })
+    const allowed = await canEditProject(user, reportData.project_id)
+    if (!allowed) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+    const { data: report, error: rErr } = await supabase.from('reports').insert({ ...reportData, created_by: user.sub }).select().single()
     if (rErr) throw rErr
     if (activities?.length) await supabase.from('report_activities').insert(activities.map((a: any) => ({ report_id: report.id, activity_id: a.activity_id, progress: a.progress })))
     if (payments?.length) await supabase.from('report_payments').insert(payments.map((p: any) => ({ ...p, report_id: report.id })))
@@ -44,4 +53,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
