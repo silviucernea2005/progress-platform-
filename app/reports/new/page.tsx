@@ -34,6 +34,9 @@ function NewReportForm() {
   const [photos, setPhotos] = useState<string[]>([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatWeight, setNewCatWeight] = useState<number>(0)
+  const [addingCat, setAddingCat] = useState(false)
 
   useEffect(() => {
     if ((window as any).pdfjsLib) return
@@ -140,6 +143,23 @@ function NewReportForm() {
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
+  async function handleAddCategory() {
+    if (!newCatName.trim() || !projectId) return
+    setAddingCat(true)
+    const res = await fetch('/api/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newCatName.trim(), default_weight: newCatWeight, project_id: projectId }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      setActivities(prev => [...prev, { id: data.activity.id, name: data.activity.name, weight: newCatWeight, progress: 0 }])
+      setNewCatName('')
+      setNewCatWeight(0)
+    } else alert('Eroare: ' + data.error)
+    setAddingCat(false)
+  }
+
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
       if (!d.user) router.push(`/login?returnTo=${encodeURIComponent('/reports/new' + (projectId ? `?project=${projectId}` : ''))}`)
@@ -150,37 +170,23 @@ function NewReportForm() {
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : []))
   }, [])
 
-  // Prefill activity progress from the project's most recent report — always, whenever a
-  // project is selected (not just when arriving from a specific "New Report" button/flow).
+  // Load this project's activities (8 standard + any custom categories), merge in
+  // saved weight overrides and the progress from the most recent report.
   useEffect(() => {
     if (!projectId) return
-    fetch(`/api/reports?project_id=${projectId}`)
-      .then(r => r.json())
-      .then(list => {
-        if (!Array.isArray(list) || !list.length) return
-        const latest = list[0] // /api/reports already sorts by period_start descending
-        if (latest?.activities?.length) {
-          setActivities(prev => prev.map(a => {
-            const found = latest.activities.find((x: any) => x.activity_id === a.id)
-            return { ...a, progress: found ? found.progress : a.progress }
-          }))
-        }
-      })
-      .catch(() => {})
-  }, [projectId])
-
-  // Load the project's saved activity weights from the server (same weights used by the last edited report)
-  useEffect(() => {
-    if (!projectId) return
-    fetch(`/api/projects/${projectId}/settings`)
-      .then(r => r.json())
-      .then(data => {
-        const w = data?.weights || {}
-        if (Object.keys(w).length) {
-          setActivities(prev => prev.map(a => ({ ...a, weight: w[a.id] !== undefined ? w[a.id] : a.weight })))
-        }
-      })
-      .catch(() => {})
+    Promise.all([
+      fetch(`/api/activities?project_id=${projectId}`).then(r => r.json()),
+      fetch(`/api/projects/${projectId}/settings`).then(r => r.json()).catch(() => ({})),
+      fetch(`/api/reports?project_id=${projectId}`).then(r => r.json()).catch(() => []),
+    ]).then(([acts, settings, reportsList]) => {
+      if (!Array.isArray(acts)) return
+      const w = settings?.weights || {}
+      const latest = Array.isArray(reportsList) && reportsList.length ? reportsList[0] : null
+      setActivities(acts.map((a: any) => {
+        const found = latest?.activities?.find((x: any) => x.activity_id === a.id)
+        return { id: a.id, name: a.name, weight: w[a.id] !== undefined ? w[a.id] : a.default_weight, progress: found ? found.progress : 0 }
+      }))
+    }).catch(() => {})
   }, [projectId])
 
   const totalProgress = activities.reduce((s, a) => s + a.progress * a.weight / 100, 0)
@@ -297,6 +303,22 @@ function NewReportForm() {
               <span style={{ fontSize: 11, color: '#9ca3af' }}>%</span>
             </div>
           ))}
+
+          {projectId && (
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 14, marginTop: 6 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 8 }}>+ Adauga categorie noua</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie (ex: Fatade sticla)"
+                  style={{ flex: 2, border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px', fontSize: 13 }} />
+                <input type="number" min={0} max={100} value={newCatWeight} onChange={e => setNewCatWeight(Number(e.target.value))} placeholder="%"
+                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px', fontSize: 13, textAlign: 'center' }} />
+                <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()}
+                  style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  {addingCat ? '...' : '+ Adauga'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Photos */}
@@ -371,4 +393,5 @@ export default function NewReportPage() {
     </Suspense>
   )
 }
+
 
