@@ -127,10 +127,23 @@ export default function DashboardPage() {
             : projects.map(p => {
               const prog = getProgress(p.id)
               const isSelected = selectedProject === p.id
+              const canDelete = currentUser && (currentUser.role === 'admin' || p.created_by === currentUser.id)
               return (
                 <div key={p.id} onClick={() => setSelectedProject(p.id)}
-                  style={{ padding: '10px 16px', cursor: 'pointer', borderLeft: isSelected ? `3px solid ${ORANGE}` : '3px solid transparent', background: isSelected ? '#fef9f5' : 'transparent' }}>
-                  <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 400, color: isSelected ? ORANGE : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                  style={{ padding: '10px 16px', cursor: 'pointer', borderLeft: isSelected ? `3px solid ${ORANGE}` : '3px solid transparent', background: isSelected ? '#fef9f5' : 'transparent', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                    <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 400, color: isSelected ? ORANGE : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                    {canDelete && (
+                      <button onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!confirm(`Ștergi proiectul "${p.name}"? Toate rapoartele lui se șterg odată cu el. Nu se poate anula.`)) return
+                        const res = await fetch(`/api/projects/${p.id}`, { method: 'DELETE' })
+                        if (res.ok) { setProjects(prev => prev.filter(x => x.id !== p.id)); if (selectedProject === p.id) setSelectedProject('all') }
+                        else { const err = await res.json().catch(() => ({})); alert(err.error || 'Nu s-a putut șterge proiectul.') }
+                      }}
+                        style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>🗑</button>
+                    )}
+                  </div>
                   {prog !== null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
                       <div style={{ flex: 1, height: 3, background: '#f3f4f6', borderRadius: 99 }}>
@@ -208,14 +221,6 @@ export default function DashboardPage() {
                               })()}
                               <Link href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
                               <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
-                              <button onClick={async () => {
-                                if (!requireLogin()) return
-                                if (!confirm('Delete this report?')) return
-                                const res = await fetch(`/api/reports/${r.id}`, { method: 'DELETE' })
-                                if (res.ok) setReports(prev => prev.filter(x => x.id !== r.id))
-                                else alert('Nu s-a putut șterge raportul.')
-                              }}
-                                style={{ ...btn('#fef2f2', '#dc2626'), padding: '5px 12px', fontSize: 12 }}>Delete</button>
                             </div>
                           </td>
                         </tr>
@@ -252,14 +257,6 @@ export default function DashboardPage() {
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
                         <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
-                        <button onClick={async () => {
-                          if (!requireLogin()) return
-                          if (!confirm('Delete this report?')) return
-                          const res = await fetch(`/api/reports/${r.id}`, { method: 'DELETE' })
-                          if (res.ok) setReports(prev => prev.filter(x => x.id !== r.id))
-                          else alert('Nu s-a putut șterge raportul.')
-                        }}
-                          style={{ ...btn('#fef2f2', '#dc2626'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Delete</button>
                       </div>
                     </div>
                   )
