@@ -19,6 +19,12 @@ async function requireAuth(req: NextRequest) {
   }
 }
 
+async function canEditProject(user: any, projectId: string): Promise<boolean> {
+  if (user.role === 'admin') return true
+  const { data } = await supabase.from('projects').select('created_by').eq('id', projectId).maybeSingle()
+  return !!data && data.created_by === user.sub
+}
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabase
     .from('reports')
@@ -32,6 +38,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
   try {
+    const { data: existingReport } = await supabase.from('reports').select('project_id').eq('id', params.id).single()
+    if (!existingReport) return NextResponse.json({ error: 'Raport negasit' }, { status: 404 })
+    const allowed = await canEditProject(user, existingReport.project_id)
+    if (!allowed) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+
     const body = await req.json()
     const update: Record<string, any> = { updated_at: new Date().toISOString() }
     if (body.works_done !== undefined) update.works_done = body.works_done
@@ -61,6 +72,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
   try {
+    const { data: existingReport } = await supabase.from('reports').select('project_id').eq('id', params.id).single()
+    if (!existingReport) return NextResponse.json({ error: 'Raport negasit' }, { status: 404 })
+    const allowed = await canEditProject(user, existingReport.project_id)
+    if (!allowed) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+
     const { error } = await supabase.from('reports').delete().eq('id', params.id)
     if (error) throw error
     return NextResponse.json({ ok: true })
