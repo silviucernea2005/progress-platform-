@@ -37,6 +37,7 @@ function NewReportForm() {
   const [newCatName, setNewCatName] = useState('')
   const [newCatWeight, setNewCatWeight] = useState<number>(0)
   const [addingCat, setAddingCat] = useState(false)
+  const [showWeights, setShowWeights] = useState(false)
 
   useEffect(() => {
     if ((window as any).pdfjsLib) return
@@ -287,18 +288,25 @@ function NewReportForm() {
         {/* Activities */}
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ fontSize: 14, fontWeight: 600, color: MCORE_DARK, margin: 0 }}>Activities Progress</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 600, color: MCORE_DARK, margin: 0 }}>Activities Progress</h2>
+              <button onClick={() => setShowWeights(!showWeights)}
+                style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
+                {showWeights ? 'Ascunde ponderi' : 'Arata ponderi'}
+              </button>
+            </div>
             <span style={{ fontSize: 22, fontWeight: 700, color: ORANGE }}>{totalProgress.toFixed(2)}%</span>
           </div>
           {activities.map(a => (
             <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <span style={{ width: 190, fontSize: 13, flexShrink: 0, color: MCORE_DARK }}>{a.name}</span>
-              <span style={{ fontSize: 11, color: '#9ca3af', width: 28, flexShrink: 0 }}>{a.weight}%</span>
+              {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28, flexShrink: 0 }}>{a.weight}%</span>}
               <input type="range" min={0} max={100} value={a.progress}
                 onChange={e => setActivities(prev => prev.map(x => x.id === a.id ? { ...x, progress: Number(e.target.value) } : x))}
                 style={{ flex: 1, accentColor: ORANGE }} />
               <input type="number" min={0} max={100} value={a.progress}
                 onChange={e => setActivities(prev => prev.map(x => x.id === a.id ? { ...x, progress: Math.min(100, Math.max(0, Number(e.target.value))) } : x))}
+                onFocus={e => e.target.select()}
                 style={{ width: 56, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'center' }} />
               <span style={{ fontSize: 11, color: '#9ca3af' }}>%</span>
             </div>
@@ -310,7 +318,9 @@ function NewReportForm() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie (ex: Fatade sticla)"
                   style={{ flex: 2, border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px', fontSize: 13 }} />
-                <input type="number" min={0} max={100} value={newCatWeight} onChange={e => setNewCatWeight(Number(e.target.value))} placeholder="%"
+                <input type="number" min={0} max={100} value={newCatWeight}
+                  onChange={e => setNewCatWeight(Math.min(100, Math.max(0, Number(e.target.value))))}
+                  onFocus={e => e.target.select()} placeholder="%"
                   style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px', fontSize: 13, textAlign: 'center' }} />
                 <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()}
                   style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
