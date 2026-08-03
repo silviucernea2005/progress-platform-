@@ -7,6 +7,7 @@ const MCORE_DARK = '#1A1A2A'
 const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
+const GREEN = '#3B9E4A'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -35,7 +36,7 @@ export default function DashboardPage() {
       const data = await res.json()
       setActivityLog(Array.isArray(data) ? data : [])
     } catch {
-      alert('Nu s-a putut încărca istoricul.')
+      alert('Could not load the activity log.')
     }
     setLoadingLog(false)
   }
@@ -53,7 +54,7 @@ export default function DashboardPage() {
       setProjectEditorIds(ids)
       setPendingEditorIds(new Set(ids))
     } catch {
-      alert('Nu s-a putut încărca lista de acces.')
+      alert('Could not load the access list.')
     }
     setLoadingAccess(false)
   }
@@ -78,7 +79,7 @@ export default function DashboardPage() {
       setProjectEditorIds(new Set(pendingEditorIds))
       setShowAccessPanel(false)
     } catch {
-      alert('Eroare la salvarea accesului.')
+      alert('Error saving access changes.')
     }
     setSavingAccess(false)
   }
@@ -99,7 +100,7 @@ export default function DashboardPage() {
 
   function requireLogin(): boolean {
     if (currentUser) return true
-    if (confirm('Trebuie să te autentifici ca să poți edita sau șterge rapoarte. Mergi la pagina de login?')) {
+    if (confirm('You need to log in to edit or delete reports. Go to the login page?')) {
       router.push('/login?returnTo=/dashboard')
     }
     return false
@@ -108,7 +109,7 @@ export default function DashboardPage() {
   function requireEditRights(projectId: string): boolean {
     if (!requireLogin()) return false
     if (!canEditMap[projectId]) {
-      alert('Nu ai drepturi de editare pentru acest proiect. Doar creatorul proiectului, un editor asignat sau un admin poate edita.')
+      alert('You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.')
       return false
     }
     return true
@@ -176,7 +177,7 @@ export default function DashboardPage() {
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
         <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ color: 'rgba(255,255,255,0.65)', textDecoration: 'none', fontSize: 13 }}>+ New Project</Link>
+          <Link href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
           <Link href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
           {currentUser?.role === 'admin' && (
             <button onClick={openActivityLog} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>📋 Activity Log</button>
@@ -224,10 +225,10 @@ export default function DashboardPage() {
                     {canDelete && (
                       <button onClick={async (e) => {
                         e.stopPropagation()
-                        if (!confirm(`Ștergi proiectul "${p.name}"? Toate rapoartele lui se șterg odată cu el. Nu se poate anula.`)) return
+                        if (!confirm(`Delete project "${p.name}"? All its reports will be deleted too. This cannot be undone.`)) return
                         const res = await fetch(`/api/projects/${p.id}`, { method: 'DELETE' })
                         if (res.ok) { setProjects(prev => prev.filter(x => x.id !== p.id)); if (selectedProject === p.id) setSelectedProject('all') }
-                        else { const err = await res.json().catch(() => ({})); alert(err.error || 'Nu s-a putut șterge proiectul.') }
+                        else { const err = await res.json().catch(() => ({})); alert(err.error || 'Could not delete the project.') }
                       }}
                         style={{ background: 'none', border: 'none', color: '#d1d5db', cursor: 'pointer', fontSize: 12, flexShrink: 0 }}>🗑</button>
                     )}
@@ -283,9 +284,9 @@ export default function DashboardPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>Acces — {projects.find(p => p.id === selectedProject)?.name}</h3>
                   <button onClick={() => setShowAccessPanel(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
-                {loadingAccess ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Se încarcă...</div> : (
+                {loadingAccess ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Loading...</div> : (
                   <>
-                    <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Bifează utilizatorii care pot edita acest proiect. Creatorul proiectului și adminii au acces automat.</p>
+                    <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Check the users who can edit this project. The project's creator and admins have automatic access.</p>
                     {allUsers.map(u => {
                       const isChecked = pendingEditorIds.has(u.id)
                       return (
@@ -299,8 +300,8 @@ export default function DashboardPage() {
                       )
                     })}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
-                      <button onClick={() => setShowAccessPanel(false)} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Anulează</button>
-                      <button onClick={saveAccessChanges} disabled={savingAccess} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>{savingAccess ? 'Se salvează...' : 'OK'}</button>
+                      <button onClick={() => setShowAccessPanel(false)} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                      <button onClick={saveAccessChanges} disabled={savingAccess} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>{savingAccess ? 'Saving...' : 'OK'}</button>
                     </div>
                   </>
                 )}
@@ -315,14 +316,14 @@ export default function DashboardPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>📋 Activity Log</h3>
                   <button onClick={() => setShowActivityLog(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
-                {loadingLog ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Se încarcă...</div> : activityLog.length === 0 ? (
-                  <div style={{ fontSize: 13, color: '#9ca3af' }}>Niciun eveniment înregistrat încă.</div>
+                {loadingLog ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Loading...</div> : activityLog.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#9ca3af' }}>No events logged yet.</div>
                 ) : (
                   activityLog.map((entry: any) => (
                     <div key={entry.id} style={{ padding: '10px 4px', borderBottom: '1px solid #f3f4f6' }}>
                       <div style={{ fontSize: 13, color: MCORE_DARK }}>{entry.details}</div>
                       <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-                        {new Date(entry.created_at).toLocaleString('ro-RO')} {entry.project?.name && `· ${entry.project.name}`}
+                        {new Date(entry.created_at).toLocaleString('en-US')} {entry.project?.name && `· ${entry.project.name}`}
                       </div>
                     </div>
                   ))
