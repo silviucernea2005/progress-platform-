@@ -34,9 +34,6 @@ function NewReportForm() {
   const [photos, setPhotos] = useState<string[]>([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [dragOver, setDragOver] = useState(false)
-  const [newCatName, setNewCatName] = useState('')
-  const [newCatWeight, setNewCatWeight] = useState<number>(0)
-  const [addingCat, setAddingCat] = useState(false)
   const [showWeights, setShowWeights] = useState(false)
 
   useEffect(() => {
@@ -144,23 +141,6 @@ function NewReportForm() {
     setPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
-  async function handleAddCategory() {
-    if (!newCatName.trim() || !projectId) return
-    setAddingCat(true)
-    const res = await fetch('/api/activities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newCatName.trim(), default_weight: newCatWeight, project_id: projectId }),
-    })
-    const data = await res.json()
-    if (data.ok) {
-      setActivities(prev => [...prev, { id: data.activity.id, name: data.activity.name, weight: newCatWeight, progress: 0 }])
-      setNewCatName('')
-      setNewCatWeight(0)
-    } else alert('Eroare: ' + data.error)
-    setAddingCat(false)
-  }
-
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
       if (!d.user) router.push(`/login?returnTo=${encodeURIComponent('/reports/new' + (projectId ? `?project=${projectId}` : ''))}`)
@@ -171,7 +151,7 @@ function NewReportForm() {
     if (!projectId) return
     fetch(`/api/projects/${projectId}/can-edit`).then(r => r.json()).then(d => {
       if (!d.allowed) {
-        alert('Nu ai drepturi de editare pentru acest proiect. Doar creatorul proiectului, un editor asignat sau un admin poate crea rapoarte.')
+        alert("You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can create reports.")
         router.push('/dashboard')
       }
     }).catch(() => {})
@@ -323,24 +303,6 @@ function NewReportForm() {
               <span style={{ fontSize: 11, color: '#9ca3af' }}>%</span>
             </div>
           ))}
-
-          {projectId && (
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 14, marginTop: 6 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 8 }}>+ Adauga categorie noua</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie (ex: Fatade sticla)"
-                  style={{ flex: 2, border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px', fontSize: 13 }} />
-                <input type="number" min={0} max={100} value={newCatWeight}
-                  onChange={e => setNewCatWeight(Math.min(100, Math.max(0, Number(e.target.value))))}
-                  onFocus={e => e.target.select()} placeholder="%"
-                  style={{ width: 70, border: '1px solid #d1d5db', borderRadius: 6, padding: '7px 10px', fontSize: 13, textAlign: 'center' }} />
-                <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()}
-                  style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {addingCat ? '...' : '+ Adauga'}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Photos */}
