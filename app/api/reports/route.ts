@@ -27,6 +27,30 @@ async function canEditProject(user: any, projectId: string): Promise<boolean> {
   return !!editor
 }
 
+async function logActivity(user: any, action: string, details: string, opts: { project_id?: string, report_id?: string } = {}) {
+  try {
+    await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action, details, project_id: opts.project_id || null, report_id: opts.report_id || null })
+  } catch {}
+}
+
+// Sends an email via Resend if RESEND_API_KEY + NOTIFY_EMAIL are configured in Vercel env vars.
+// Silently does nothing otherwise, so this never breaks the app if not set up yet.
+async function sendNotificationEmail(subject: string, html: string) {
+  if (!process.env.RESEND_API_KEY || !process.env.NOTIFY_EMAIL) return
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.NOTIFY_FROM_EMAIL || 'Progress Platform <onboarding@resend.dev>',
+        to: process.env.NOTIFY_EMAIL,
+        subject,
+        html,
+      }),
+    })
+  } catch {}
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const projectId = searchParams.get('project_id')
@@ -50,6 +74,14 @@ export async function POST(req: NextRequest) {
     if (rErr) throw rErr
     if (activities?.length) await supabase.from('report_activities').insert(activities.map((a: any) => ({ report_id: report.id, activity_id: a.activity_id, progress: a.progress })))
     if (payments?.length) await supabase.from('report_payments').insert(payments.map((p: any) => ({ ...p, report_id: report.id })))
+
+    const { data: projectRow } = await supabase.from('projects').select('name').eq('id', reportData.project_id).maybeSingle()
+    await logActivity(user, 'report_created', `${user.name} a creat un raport (${reportData.period_start} – ${reportData.period_end}) pentru "${projectRow?.name || ''}"`, { project_id: reportData.project_id, report_id: report.id })
+    await sendNotificationEmail(
+      `Raport nou completat — ${projectRow?.name || ''}`,
+      `<p><strong>${user.name}</strong> a completat un raport nou pentru proiectul <strong>${projectRow?.name || ''}</strong>, perioada ${reportData.period_start} – ${reportData.period_end}.</p>`
+    )
+
     return NextResponse.json({ ok: true, id: report.id })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
