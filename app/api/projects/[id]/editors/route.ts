@@ -22,7 +22,7 @@ async function requireAuth(req: NextRequest) {
 // List the users currently assigned as editors for this project. Admin-only.
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Doar un admin poate vedea aceasta lista.' }, { status: 403 })
+  if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Only an admin can view this list.' }, { status: 403 })
   const { data, error } = await supabase
     .from('project_editors')
     .select('user_id, users(id, name, email)')
@@ -34,16 +34,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // Assign a user as an editor on this project. Body: { user_id }. Admin-only.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Doar un admin poate asigna editori.' }, { status: 403 })
+  if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Only an admin can assign editors.' }, { status: 403 })
   try {
     const body = await req.json()
-    if (!body.user_id) return NextResponse.json({ error: 'user_id este obligatoriu' }, { status: 400 })
+    if (!body.user_id) return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
     const { error } = await supabase.from('project_editors').upsert({ project_id: params.id, user_id: body.user_id })
     if (error) throw error
     try {
       const { data: target } = await supabase.from('users').select('name').eq('id', body.user_id).maybeSingle()
       const { data: proj } = await supabase.from('projects').select('name').eq('id', params.id).maybeSingle()
-      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'editor_assigned', details: `${user.name} a dat acces de editare lui ${target?.name || body.user_id} pe proiectul "${proj?.name || ''}"`, project_id: params.id })
+      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'editor_assigned', details: `${user.name} gave edit access to ${target?.name || body.user_id} on project "${proj?.name || ''}"`, project_id: params.id })
     } catch {}
     return NextResponse.json({ ok: true })
   } catch (e: any) {
@@ -54,10 +54,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 // Remove a user's editor assignment. Body: { user_id }. Admin-only.
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Doar un admin poate elimina editori.' }, { status: 403 })
+  if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Only an admin can remove editors.' }, { status: 403 })
   try {
     const body = await req.json()
-    if (!body.user_id) return NextResponse.json({ error: 'user_id este obligatoriu' }, { status: 400 })
+    if (!body.user_id) return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
     const { error } = await supabase.from('project_editors').delete().eq('project_id', params.id).eq('user_id', body.user_id)
     if (error) throw error
     return NextResponse.json({ ok: true })
