@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const { activities, payments, weekly, created_by, ...reportData } = body
     if (!reportData.project_id) return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
     const allowed = await canEditProject(user, reportData.project_id)
-    if (!allowed) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+    if (!allowed) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
     const { data: report, error: rErr } = await supabase.from('reports').insert({ ...reportData, created_by: user.sub }).select().single()
     if (rErr) throw rErr
     if (activities?.length) await supabase.from('report_activities').insert(activities.map((a: any) => ({ report_id: report.id, activity_id: a.activity_id, progress: a.progress })))
