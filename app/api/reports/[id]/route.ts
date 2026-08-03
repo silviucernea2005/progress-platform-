@@ -49,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { data: existingReport } = await supabase.from('reports').select('project_id').eq('id', params.id).single()
     if (!existingReport) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
     const allowed = await canEditProject(user, existingReport.project_id)
-    if (!allowed) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+    if (!allowed) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
 
     const body = await req.json()
     const update: Record<string, any> = { updated_at: new Date().toISOString() }
@@ -84,7 +84,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     const { data: existingReport } = await supabase.from('reports').select('project_id').eq('id', params.id).single()
     if (!existingReport) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
     const allowed = await canEditProject(user, existingReport.project_id)
-    if (!allowed) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+    if (!allowed) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
 
     const { error } = await supabase.from('reports').delete().eq('id', params.id)
     if (error) throw error
