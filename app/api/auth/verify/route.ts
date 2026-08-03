@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const { email, pin } = await req.json()
     const { data: user, error } = await supabase
       .from('users').select('*').eq('email', email.toLowerCase().trim()).single()
-    if (error || !user) return NextResponse.json({ error: 'Utilizator negasit' }, { status: 401 })
+    if (error || !user) return NextResponse.json({ error: 'User not found' }, { status: 401 })
     const valid = await bcrypt.compare(String(pin), user.pin_hash)
     if (!valid) return NextResponse.json({ error: 'PIN incorect' }, { status: 401 })
     const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
@@ -26,4 +26,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Eroare server' }, { status: 500 })
   }
 }
+
 
