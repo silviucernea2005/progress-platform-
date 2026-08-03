@@ -168,6 +168,16 @@ function NewReportForm() {
   }, [])
 
   useEffect(() => {
+    if (!projectId) return
+    fetch(`/api/projects/${projectId}/can-edit`).then(r => r.json()).then(d => {
+      if (!d.allowed) {
+        alert('Nu ai drepturi de editare pentru acest proiect. Doar creatorul proiectului, un editor asignat sau un admin poate crea rapoarte.')
+        router.push('/dashboard')
+      }
+    }).catch(() => {})
+  }, [projectId])
+
+  useEffect(() => {
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : []))
   }, [])
 
