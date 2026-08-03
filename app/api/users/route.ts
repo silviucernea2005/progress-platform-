@@ -24,7 +24,7 @@ async function requireAdmin(req: NextRequest) {
 // for assigning editors to projects.
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Doar un admin poate vedea lista de utilizatori.' }, { status: 403 })
+  if (!admin) return NextResponse.json({ error: 'Only an admin can view the user list.' }, { status: 403 })
   const { data, error } = await supabase.from('users').select('id, name, email, role').order('name', { ascending: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
