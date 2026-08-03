@@ -92,7 +92,7 @@ export default function ReportPage() {
       return false
     }
     if (!canEdit) {
-      alert('You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.')
+      alert("You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.")
       return false
     }
     return true
