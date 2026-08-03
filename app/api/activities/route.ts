@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     if (!body.name || !body.project_id) return NextResponse.json({ error: 'name and project_id are required' }, { status: 400 })
-    if (!(await canEditProject(user, body.project_id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+    if (!(await canEditProject(user, body.project_id))) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
 
     const { data: existing } = await supabase.from('activities').select('sort_order').order('sort_order', { ascending: false }).limit(1)
     const nextSortOrder = (existing?.[0]?.sort_order || 0) + 1
