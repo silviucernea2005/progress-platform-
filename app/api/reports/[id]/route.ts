@@ -27,6 +27,12 @@ async function canEditProject(user: any, projectId: string): Promise<boolean> {
   return !!editor
 }
 
+async function logActivity(user: any, action: string, details: string, opts: { project_id?: string, report_id?: string } = {}) {
+  try {
+    await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action, details, project_id: opts.project_id || null, report_id: opts.report_id || null })
+  } catch {}
+}
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabase
     .from('reports')
@@ -64,6 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         if (error) throw error
       }
     }
+    await logActivity(user, 'report_edited', `${user.name} a editat un raport`, { project_id: existingReport.project_id, report_id: params.id })
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -81,6 +88,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
     const { error } = await supabase.from('reports').delete().eq('id', params.id)
     if (error) throw error
+    await logActivity(user, 'report_deleted', `${user.name} a șters un raport`, { project_id: existingReport.project_id })
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
