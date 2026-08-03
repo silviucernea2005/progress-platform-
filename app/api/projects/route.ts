@@ -27,13 +27,13 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   try {
     const body = await req.json()
     const { data, error } = await supabase.from('projects').insert({ ...body, created_by: user.sub }).select().single()
     if (error) throw error
     try {
-      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'project_created', details: `${user.name} a creat proiectul "${data.name}"`, project_id: data.id })
+      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'project_created', details: `${user.name} created project "${data.name}"`, project_id: data.id })
     } catch {}
     return NextResponse.json({ ok: true, data, id: data.id })
   } catch (e: any) {
