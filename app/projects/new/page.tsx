@@ -67,7 +67,7 @@ export default function NewProjectPage() {
   }, [projectId])
 
   async function handleCreateProject(skipCheck = false) {
-    if (!name) return alert('Numele proiectului este obligatoriu')
+    if (!name) return alert('Project name is required')
     if (!skipCheck) {
       const similar = findSimilarProject(name)
       if (similar) {
@@ -84,7 +84,7 @@ export default function NewProjectPage() {
     })
     const data = await res.json()
     if (data.ok) setProjectId(data.id)
-    else alert('Eroare: ' + data.error)
+    else alert('Error: ' + data.error)
     setSaving(false)
   }
 
@@ -102,7 +102,7 @@ export default function NewProjectPage() {
       setWeights(prev => ({ ...prev, [data.activity.id]: newCatWeight }))
       setNewCatName('')
       setNewCatWeight(0)
-    } else alert('Eroare: ' + data.error)
+    } else alert('Error: ' + data.error)
     setAddingCat(false)
   }
 
@@ -128,39 +128,39 @@ export default function NewProjectPage() {
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 14 }}>← Inapoi</button>
       </header>
       <main style={{ maxWidth: 600, margin: '0 auto', padding: '32px 24px' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600, color: '#111827', marginBottom: 24 }}>Proiect nou</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 600, color: '#111827', marginBottom: 24 }}>New Project</h1>
 
         <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20, opacity: projectId ? 0.6 : 1 }}>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Nume proiect *</label>
-            <input value={name} onChange={e => { setName(e.target.value); setSimilarWarning(null) }} disabled={!!projectId} style={inputStyle} placeholder="Ex: Bocsa Retail Park" />
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Project Name *</label>
+            <input value={name} onChange={e => { setName(e.target.value); setSimilarWarning(null) }} disabled={!!projectId} style={inputStyle} placeholder="e.g. Bocsa Retail Park" />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Locatie</label>
-            <input value={location} onChange={e => setLocation(e.target.value)} disabled={!!projectId} style={inputStyle} placeholder="Ex: Bocsa, Caras-Severin" />
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Location</label>
+            <input value={location} onChange={e => setLocation(e.target.value)} disabled={!!projectId} style={inputStyle} placeholder="e.g. Bocsa, Caras-Severin" />
           </div>
           <div style={{ marginBottom: projectId ? 0 : 24 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Client</label>
-            <input value={client} onChange={e => setClient(e.target.value)} disabled={!!projectId} style={inputStyle} placeholder="Ex: Lidl Romania" />
+            <input value={client} onChange={e => setClient(e.target.value)} disabled={!!projectId} style={inputStyle} placeholder="e.g. Lidl Romania" />
           </div>
 
           {similarWarning && !projectId && (
             <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-              ⚠️ Există deja un proiect cu un nume identic sau similar: <strong>"{similarWarning}"</strong>. Sigur vrei să creezi un proiect nou, separat?
+              ⚠️ A project with an identical or similar name already exists: <strong>"{similarWarning}"</strong>. Are you sure you want to create a new, separate project?
               <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
                 <button onClick={() => { setSimilarWarning(null); handleCreateProject(true) }}
-                  style={{ padding: '6px 14px', background: '#92400e', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Continuă totuși</button>
+                  style={{ padding: '6px 14px', background: '#92400e', color: '#fff', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Continue anyway</button>
                 <button onClick={() => setSimilarWarning(null)}
-                  style={{ padding: '6px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Anulează</button>
+                  style={{ padding: '6px 14px', background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
           )}
 
           {!projectId && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-              <button onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Anuleaza</button>
+              <button onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
               <button onClick={() => handleCreateProject()} disabled={saving} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-                {saving ? 'Se salveaza...' : 'Continua →'}
+                {saving ? 'Saving...' : 'Continue →'}
               </button>
             </div>
           )}
@@ -169,7 +169,7 @@ export default function NewProjectPage() {
         {projectId && (
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: 0 }}>Ponderi activitati</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: 0 }}>Activity Weights</h2>
               <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: totalWeight === 100 ? '#ecfdf5' : '#fef2f2', color: totalWeight === 100 ? '#065f46' : '#dc2626' }}>
                 Total: {totalWeight}%
               </span>
@@ -188,22 +188,22 @@ export default function NewProjectPage() {
             </div>
 
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>+ Adauga categorie noua</label>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>+ Add new category</label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie (ex: Fatade sticla)" style={{ ...inputStyle, flex: 2 }} />
+                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Category name (e.g. Glass facades)" style={{ ...inputStyle, flex: 2 }} />
                 <input type="number" min={0} max={100} value={newCatWeight}
                   onChange={e => setNewCatWeight(Math.min(100, Math.max(0, Number(e.target.value))))}
                   onFocus={e => e.target.select()} placeholder="%" style={{ ...inputStyle, flex: 1, textAlign: 'center' }} />
                 <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()} style={{ padding: '9px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {addingCat ? '...' : '+ Adauga'}
+                  {addingCat ? '...' : '+ Add'}
                 </button>
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button onClick={() => router.push('/dashboard')} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Sari peste</button>
+              <button onClick={() => router.push('/dashboard')} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Skip</button>
               <button onClick={handleFinish} disabled={savingWeights} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-                {savingWeights ? 'Se salveaza...' : 'Salveaza ponderi & Termina'}
+                {savingWeights ? 'Saving...' : 'Save weights & Finish'}
               </button>
             </div>
           </div>
