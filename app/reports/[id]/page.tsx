@@ -677,24 +677,32 @@ export default function ReportPage() {
       const trendFull: (number|null)[] = [...Array(cumData.length - 1).fill(null)]
       const trendColor = getTrendColor()
 
-      // Extend the label axis far enough to show both the regression trend AND the
-      // contract plan line in full, whichever of the two finishes later.
+      // Extend the label axis (independent of when the trend hits 100%) far enough to
+      // show both the trend projection AND the full contract plan line, whichever of
+      // the two finishes later.
       const trendFinishTarget = constructionFinishEstimated ? new Date(constructionFinishEstimated) : null
       const contractFinishTarget = contractFinish ? new Date(contractFinish) : null
       const extendUntil = [trendFinishTarget, contractFinishTarget]
         .filter((d): d is Date => d !== null)
         .sort((a, b) => b.getTime() - a.getTime())[0] || null
 
-      if (cumData.length >= 2 && extendUntil) {
+      if (extendUntil) {
+        let current = new Date(labels[labels.length - 1])
+        while (current < extendUntil) {
+          current = new Date(current.getTime() + 7 * 86400000)
+          allLabels.push(current.toISOString().split('T')[0])
+        }
+      }
+
+      if (cumData.length >= 2) {
         const lastProgress = cumData[cumData.length - 1]
         const weeklyGain = Math.max(trendWeeklySlope ?? 0, 0)
-        trendFull.push(lastProgress)
-        let current = new Date(labels[labels.length - 1])
         let currentProg = lastProgress
-        while (current < extendUntil && currentProg < 100) {
-          current = new Date(current.getTime() + 7 * 86400000)
+        trendFull.push(lastProgress)
+        // Trend goes flat at 100% once reached, but the axis (and the Contract Plan
+        // line) keeps going — they're no longer coupled to the same stopping point.
+        for (let i = labels.length; i < allLabels.length; i++) {
           currentProg = Math.min(100, currentProg + weeklyGain)
-          allLabels.push(current.toISOString().split('T')[0])
           trendFull.push(parseFloat(currentProg.toFixed(2)))
         }
       } else {
