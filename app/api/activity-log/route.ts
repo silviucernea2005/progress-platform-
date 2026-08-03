@@ -22,7 +22,7 @@ async function requireAdmin(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Doar un admin poate vedea acest istoric.' }, { status: 403 })
+  if (!admin) return NextResponse.json({ error: 'Only an admin can view this log.' }, { status: 403 })
   const { data, error } = await supabase
     .from('activity_log')
     .select('*, project:projects(name)')
