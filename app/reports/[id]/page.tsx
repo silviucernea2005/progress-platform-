@@ -86,13 +86,13 @@ export default function ReportPage() {
 
   function requireLogin(): boolean {
     if (!currentUser) {
-      if (confirm('Trebuie să te autentifici ca să poți edita. Mergi la pagina de login?')) {
+      if (confirm('You need to log in to edit. Go to the login page?')) {
         router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)
       }
       return false
     }
     if (!canEdit) {
-      alert('Nu ai drepturi de editare pentru acest proiect. Doar creatorul proiectului, un editor asignat sau un admin poate edita.')
+      alert('You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.')
       return false
     }
     return true
@@ -130,7 +130,7 @@ export default function ReportPage() {
           if (!settingsFetch.ok) {
             const err = await settingsFetch.json().catch(() => ({}))
             console.error('Failed to load project settings:', err)
-            setSettingsLoadError(`Nu s-au putut încărca datele de proiect de pe server (${err.error || settingsFetch.status}). Datele afișate pot fi incomplete.`)
+            setSettingsLoadError(`Could not load project data from the server (${err.error || settingsFetch.status}). The displayed data may be incomplete.`)
           }
           const settingsRes = await settingsFetch.json()
           let d = settingsRes?.dates || {}
@@ -155,7 +155,7 @@ export default function ReportPage() {
           setWeights(w)
         } catch (e) {
           console.error('Error loading project settings:', e)
-          setSettingsLoadError('Eroare neașteptată la încărcarea datelor de proiect de pe server.')
+          setSettingsLoadError('Unexpected error loading project data from the server.')
         }
 
         // Photos now live on the server too. Migrate any left over from this browser's
@@ -203,11 +203,11 @@ export default function ReportPage() {
       const res = await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates }) })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        alert(`Nu s-au putut salva datele pe server: ${err.error || res.status}. Datele NU sunt vizibile pe alte computere până nu se rezolvă.`)
+        alert(`Could not save the data to the server: ${err.error || res.status}. The data will NOT be visible on other computers until this is fixed.`)
         return
       }
     } catch {
-      alert('Eroare de rețea la salvarea datelor. Verifică conexiunea și încearcă din nou.')
+      alert('Network error saving the data. Check your connection and try again.')
       return
     }
     setShowDates(false)
@@ -226,8 +226,15 @@ export default function ReportPage() {
       setPeriodError('')
     }
     setEditing(turningOn)
-    setEditingWeights(turningOn)
     setEditingPeriod(turningOn)
+  }
+
+  function toggleWeightsEdit() {
+    if (currentUser?.role !== 'admin') {
+      alert('Only an admin can edit weights and categories.')
+      return
+    }
+    setEditingWeights(!editingWeights)
   }
 
   async function handleAddCategory() {
@@ -246,9 +253,9 @@ export default function ReportPage() {
         setActivityProgress(prev => ({ ...prev, [data.activity.id]: 0 }))
         setNewCatName('')
         setNewCatWeight(0)
-      } else alert('Eroare: ' + data.error)
+      } else alert('Error: ' + data.error)
     } catch {
-      alert('Eroare de rețea.')
+      alert('Network error.')
     }
     setAddingCat(false)
   }
@@ -256,7 +263,7 @@ export default function ReportPage() {
   async function saveAllEdits() {
     setPeriodError('')
     if (periodStart && periodEnd && periodStart > periodEnd) {
-      setPeriodError('Data de start nu poate fi după data de final.')
+      setPeriodError('The start date cannot be after the end date.')
       return
     }
     setSaving(true)
@@ -276,7 +283,7 @@ export default function ReportPage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        setPeriodError(`Nu s-a putut salva: ${err.error || res.status}`)
+        setPeriodError(`Could not save: ${err.error || res.status}`)
         setSaving(false); setSavingPeriod(false)
         return
       }
@@ -292,7 +299,7 @@ export default function ReportPage() {
       setCustomActivities([])
       setEditing(false); setEditingWeights(false); setEditingPeriod(false)
     } catch {
-      setPeriodError('Eroare de rețea. Verifică conexiunea și încearcă din nou.')
+      setPeriodError('Network error. Check your connection and try again.')
     }
     setSaving(false)
     setSavingPeriod(false)
@@ -305,13 +312,13 @@ export default function ReportPage() {
       const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        alert(err.error || 'Nu s-a putut șterge raportul.')
+        alert(err.error || 'Could not delete the report.')
         setDeleting(false)
         return
       }
       router.push('/dashboard')
     } catch {
-      alert('Eroare de rețea.')
+      alert('Network error.')
       setDeleting(false)
     }
   }
@@ -325,9 +332,11 @@ export default function ReportPage() {
 
   function computeProgress(rep: any) {
     const acts = rep.activities || []
+    const isCurrentReportBeingEdited = editing && rep.id === id
     return parseFloat(acts.reduce((s: number, a: any) => {
       const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
-      return s + a.progress * w / 100
+      const progress = isCurrentReportBeingEdited ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
+      return s + progress * w / 100
     }, 0).toFixed(2))
   }
 
@@ -516,10 +525,10 @@ export default function ReportPage() {
           }
         }
         if (uploadedAll.length) setPhotos(prev => [...prev, ...uploadedAll.map((p: any) => ({ id: p.id, url: p.url }))])
-        if (failedCount > 0) alert(`S-au salvat ${uploadedAll.length} din ${newPhotos.length} poze. ${failedCount} au eșuat — încearcă să le încarci din nou.`)
+        if (failedCount > 0) alert(`Saved ${uploadedAll.length} of ${newPhotos.length} photos. ${failedCount} failed — try uploading them again.`)
       }
     } catch {
-      alert('A apărut o eroare de rețea la salvarea pozelor. Verifică conexiunea și încearcă din nou.')
+      alert('A network error occurred while saving the photos. Check your connection and try again.')
     }
     setUploadingPhoto(false)
     setPhotosJustSaved(false)
@@ -531,7 +540,7 @@ export default function ReportPage() {
       if (Array.isArray(data)) setPhotos(data.map((p: any) => ({ id: p.id, url: p.url })))
       setPhotosJustSaved(true)
       setTimeout(() => setPhotosJustSaved(false), 2500)
-    }).catch(() => alert('Nu am putut sincroniza cu serverul. Verifică conexiunea.'))
+    }).catch(() => alert('Could not sync with the server. Check your connection.'))
   }
 
   function deleteAllPhotos() {
@@ -760,7 +769,7 @@ export default function ReportPage() {
       document.head.appendChild(s)
     }
     loadChartJS()
-  }, [id, allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart])
+  }, [id, allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart, activityProgress, editing])
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Loading...</div>
   const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
@@ -783,7 +792,7 @@ export default function ReportPage() {
         body: JSON.stringify({ mainChartImage, miniChartImages })
       })
       if (!res.ok) {
-        alert('Nu s-a putut genera documentul Word.')
+        alert('Could not generate the Word document.')
         return
       }
       const blob = await res.blob()
@@ -796,7 +805,7 @@ export default function ReportPage() {
       a.remove()
       URL.revokeObjectURL(url)
     } catch {
-      alert('Eroare de rețea la generarea documentului Word.')
+      alert('Network error generating the Word document.')
     }
   }
 
@@ -1023,7 +1032,10 @@ ${photosHtml}
   if (!report || report.error) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Report not found</div>
 
   const acts = (report.activities || []).sort((a: any, b: any) => (a.activity?.sort_order || 0) - (b.activity?.sort_order || 0))
-  const totalProgress = acts.reduce((s: number, a: any) => s + a.progress * getWeight(a.activity_id, a.activity?.default_weight || 0) / 100, 0)
+  const totalProgress = acts.reduce((s: number, a: any) => {
+    const progress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
+    return s + progress * getWeight(a.activity_id, a.activity?.default_weight || 0) / 100
+  }, 0)
   const trendColor = getTrendColor()
 
   // Weekly progress (difference from previous report)
@@ -1052,6 +1064,9 @@ ${photosHtml}
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
           <button onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
           <button onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+          {currentUser?.role === 'admin' && (
+            <button onClick={toggleWeightsEdit} style={btn(editingWeights ? ORANGE : 'rgba(255,255,255,0.1)')}>⚖️ Weights</button>
+          )}
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
             {showExportMenu && (
@@ -1157,7 +1172,7 @@ ${photosHtml}
               ))}
               {customActivities.map((ca: any) => (
                 <div key={ca.id} style={{ background: '#eff6ff', borderRadius: 8, padding: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(nou)</span></div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(new)</span></div>
                   <input type="number" min={0} max={100} value={weights[ca.id] ?? 0}
                     onChange={e => setWeights(prev => ({ ...prev, [ca.id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
                     onFocus={e => e.target.select()}
@@ -1166,14 +1181,14 @@ ${photosHtml}
               ))}
             </div>
             <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 14, marginTop: 14 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 8 }}>+ Adauga categorie noua</label>
+              <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 8 }}>+ Add new category</label>
               <div style={{ display: 'flex', gap: 8, maxWidth: 420 }}>
-                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Nume categorie" style={{ ...inp, flex: 2 }} />
+                <input value={newCatName} onChange={e => setNewCatName(e.target.value)} placeholder="Category name" style={{ ...inp, flex: 2 }} />
                 <input type="number" min={0} max={100} value={newCatWeight}
                   onChange={e => setNewCatWeight(Math.min(100, Math.max(0, Number(e.target.value))))}
                   onFocus={e => e.target.select()} placeholder="%" style={{ ...inp, width: 70, textAlign: 'center' }} />
                 <button onClick={handleAddCategory} disabled={addingCat || !newCatName.trim()} style={{ padding: '7px 16px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                  {addingCat ? '...' : '+ Adauga'}
+                  {addingCat ? '...' : '+ Add'}
                 </button>
               </div>
             </div>
@@ -1299,7 +1314,7 @@ ${photosHtml}
             const displayProgress = activityProgress[ca.id] ?? 0
             return (
               <div key={ca.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
-                <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(nou)</span></span>
+                <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(new)</span></span>
                 {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
                 <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
                   <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
@@ -1400,13 +1415,13 @@ ${photosHtml}
               {photosJustSaved && <span style={{ fontSize: 12, color: '#065f46' }}>✓ Saved</span>}
               {deletePhotoMode ? (
                 <>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoIds.size} selectate</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoIds.size} selected</span>
                   <button onClick={() => { setDeletePhotoMode(false); setSelectedPhotoIds(new Set()) }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
                   <button onClick={deleteSelectedPhotos} disabled={!selectedPhotoIds.size} style={btn('#dc2626')}>🗑 Delete selected</button>
                 </>
               ) : rearrangeMode ? (
                 <>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>Trage pozele cu mouse-ul (sau ‹ ›) pentru a schimba ordinea</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>Drag photos with your mouse (or use ‹ ›) to reorder</span>
                   <button onClick={savePhotoOrder} style={btn(BLUE)}>✓ Done rearranging</button>
                 </>
               ) : (
