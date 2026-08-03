@@ -239,7 +239,7 @@ function NewReportForm() {
   return (
     <div style={{ minHeight: '100vh', background: '#f5f5f3', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 12 }}>Square 7</div>
@@ -377,5 +377,6 @@ export default function NewReportPage() {
     </Suspense>
   )
 }
+
 
 
