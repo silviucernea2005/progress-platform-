@@ -423,6 +423,15 @@ export default function ReportPage() {
     return '#aaaaaa'
   }
 
+  // Separate color just for the Trend line / "Trend finish" badge / "at current pace"
+  // date: green if the trend projects finishing on or before the contract deadline
+  // (even if currently behind and merely recovering), red if it projects finishing late.
+  function getTrendLineColor() {
+    if (!trendFinishDate) return '#aaaaaa'
+    if (contractFinish) return trendFinishDate <= contractFinish ? '#86efac' : '#fca5a5'
+    return '#aaaaaa'
+  }
+
   function getDelayBadge(): { icon: string; text: string; color: string } | null {
     if (delayStatus === 'onTrack') return { icon: '🟢', text: 'On track vs. contract', color: '#86efac' }
     if (delayStatus === 'recovering') return { icon: '🟠', text: 'Behind, but recovering', color: '#fbbf24' }
@@ -672,7 +681,7 @@ export default function ReportPage() {
       const labels = visibleReports.map(r => r.period_end)
       const cumData = visibleReports.map(r => computeProgress(r))
       const actualData = cumData.map((v, i) => i === 0 ? v : parseFloat((v - cumData[i-1]).toFixed(2)))
-      const trendColor = getTrendColor()
+      const trendColor = getTrendLineColor()
 
       // Real linear time axis (day-offset from an epoch) instead of evenly-spaced
       // categories. A category axis gives every label the same pixel width even when
@@ -741,6 +750,10 @@ export default function ReportPage() {
                   title: (items: any) => items[0] ? formatOffset(items[0].parsed.x) : '',
                   label: (ctx: any) => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y}%` : ''
                 }
+              },
+              // {x,y} point objects would otherwise render as "x: .. y: .." — show just the value.
+              datalabels: {
+                formatter: (value: any) => (value && typeof value === 'object' ? (value.y ?? '') : value)
               }
             },
             scales: {
@@ -1091,6 +1104,7 @@ ${photosHtml}
     return s + progress * getWeight(a.activity_id, a.activity?.default_weight || 0) / 100
   }, 0)
   const trendColor = getTrendColor()
+  const trendLineColor = getTrendLineColor()
 
   // Weekly progress (difference from previous report)
   const currentIdx = allReports.findIndex(r => r.id === id)
@@ -1285,7 +1299,7 @@ ${photosHtml}
               )}
               {trendFinishDate && (
                 <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                  At current pace, project finishes: <strong style={{ color: trendColor }}>{trendFinishDate}</strong>
+                  At current pace, project finishes: <strong style={{ color: trendLineColor }}>{trendFinishDate}</strong>
                 </div>
               )}
             </div>
@@ -1326,7 +1340,7 @@ ${photosHtml}
                   </div>
                 )}
                 {trendFinishDate && (
-                  <div style={{ fontSize: 11, color: trendColor, fontWeight: 600, background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, color: trendLineColor, fontWeight: 600, background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
                     📅 Trend finish: {trendFinishDate}
                   </div>
                 )}
