@@ -40,6 +40,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!body.user_id) return NextResponse.json({ error: 'user_id este obligatoriu' }, { status: 400 })
     const { error } = await supabase.from('project_editors').upsert({ project_id: params.id, user_id: body.user_id })
     if (error) throw error
+    try {
+      const { data: target } = await supabase.from('users').select('name').eq('id', body.user_id).maybeSingle()
+      const { data: proj } = await supabase.from('projects').select('name').eq('id', params.id).maybeSingle()
+      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'editor_assigned', details: `${user.name} a dat acces de editare lui ${target?.name || body.user_id} pe proiectul "${proj?.name || ''}"`, project_id: params.id })
+    } catch {}
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
