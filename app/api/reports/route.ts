@@ -63,23 +63,23 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   try {
     const body = await req.json()
     const { activities, payments, weekly, created_by, ...reportData } = body
-    if (!reportData.project_id) return NextResponse.json({ error: 'project_id este obligatoriu' }, { status: 400 })
+    if (!reportData.project_id) return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
     const allowed = await canEditProject(user, reportData.project_id)
-    if (!allowed) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+    if (!allowed) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
     const { data: report, error: rErr } = await supabase.from('reports').insert({ ...reportData, created_by: user.sub }).select().single()
     if (rErr) throw rErr
     if (activities?.length) await supabase.from('report_activities').insert(activities.map((a: any) => ({ report_id: report.id, activity_id: a.activity_id, progress: a.progress })))
     if (payments?.length) await supabase.from('report_payments').insert(payments.map((p: any) => ({ ...p, report_id: report.id })))
 
     const { data: projectRow } = await supabase.from('projects').select('name').eq('id', reportData.project_id).maybeSingle()
-    await logActivity(user, 'report_created', `${user.name} a creat un raport (${reportData.period_start} – ${reportData.period_end}) pentru "${projectRow?.name || ''}"`, { project_id: reportData.project_id, report_id: report.id })
+    await logActivity(user, 'report_created', `${user.name} created a report (${reportData.period_start} – ${reportData.period_end}) for "${projectRow?.name || ''}"`, { project_id: reportData.project_id, report_id: report.id })
     await sendNotificationEmail(
-      `Raport nou completat — ${projectRow?.name || ''}`,
-      `<p><strong>${user.name}</strong> a completat un raport nou pentru proiectul <strong>${projectRow?.name || ''}</strong>, perioada ${reportData.period_start} – ${reportData.period_end}.</p>`
+      `New report completed — ${projectRow?.name || ''}`,
+      `<p><strong>${user.name}</strong> completed a new report for project <strong>${projectRow?.name || ''}</strong>, period ${reportData.period_start} – ${reportData.period_end}.</p>`
     )
 
     return NextResponse.json({ ok: true, id: report.id })
