@@ -44,8 +44,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // placeholders (e.g. old .xls/.doc filenames) are stored as-is in the url column.
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
-  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
   try {
     const { photos } = await req.json()
     if (!Array.isArray(photos) || !photos.length) return NextResponse.json({ error: 'No photos provided' }, { status: 400 })
@@ -89,8 +89,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 // No dedicated sort column exists, so we re-stamp created_at spaced 1s apart in the new order (GET already sorts by created_at asc).
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
-  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
   try {
     const { order } = await req.json()
     if (!Array.isArray(order) || !order.length) return NextResponse.json({ error: 'order must be a non-empty array' }, { status: 400 })
@@ -109,8 +109,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 // Delete a single photo ({ photoId }) or all photos for this report ({ all: true })
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
-  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
   try {
     const body = await req.json().catch(() => ({} as any))
 
