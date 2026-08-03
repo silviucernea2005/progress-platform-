@@ -48,11 +48,11 @@ export async function GET(req: NextRequest) {
 // Body: { name, default_weight, project_id }
 export async function POST(req: NextRequest) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   try {
     const body = await req.json()
-    if (!body.name || !body.project_id) return NextResponse.json({ error: 'name si project_id sunt obligatorii' }, { status: 400 })
-    if (!(await canEditProject(user, body.project_id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+    if (!body.name || !body.project_id) return NextResponse.json({ error: 'name and project_id are required' }, { status: 400 })
+    if (!(await canEditProject(user, body.project_id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
 
     const { data: existing } = await supabase.from('activities').select('sort_order').order('sort_order', { ascending: false }).limit(1)
     const nextSortOrder = (existing?.[0]?.sort_order || 0) + 1
