@@ -21,6 +21,25 @@ export default function DashboardPage() {
   const [projectEditorIds, setProjectEditorIds] = useState<Set<string>>(new Set())
   const [loadingAccess, setLoadingAccess] = useState(false)
 
+  const [pendingEditorIds, setPendingEditorIds] = useState<Set<string>>(new Set())
+  const [savingAccess, setSavingAccess] = useState(false)
+  const [showActivityLog, setShowActivityLog] = useState(false)
+  const [activityLog, setActivityLog] = useState<any[]>([])
+  const [loadingLog, setLoadingLog] = useState(false)
+
+  async function openActivityLog() {
+    setShowActivityLog(true)
+    setLoadingLog(true)
+    try {
+      const res = await fetch('/api/activity-log')
+      const data = await res.json()
+      setActivityLog(Array.isArray(data) ? data : [])
+    } catch {
+      alert('Nu s-a putut încărca istoricul.')
+    }
+    setLoadingLog(false)
+  }
+
   async function openAccessPanel() {
     setShowAccessPanel(true)
     setLoadingAccess(true)
@@ -30,33 +49,53 @@ export default function DashboardPage() {
         fetch(`/api/projects/${selectedProject}/editors`).then(r => r.json()),
       ])
       setAllUsers(Array.isArray(usersRes) ? usersRes : [])
-      setProjectEditorIds(new Set(Array.isArray(editorsRes) ? editorsRes.map((e: any) => e.user_id) : []))
+      const ids = new Set<string>(Array.isArray(editorsRes) ? editorsRes.map((e: any) => e.user_id) : [])
+      setProjectEditorIds(ids)
+      setPendingEditorIds(new Set(ids))
     } catch {
       alert('Nu s-a putut încărca lista de acces.')
     }
     setLoadingAccess(false)
   }
 
-  async function toggleEditor(userId: string, isEditor: boolean) {
-    const method = isEditor ? 'DELETE' : 'POST'
-    const res = await fetch(`/api/projects/${selectedProject}/editors`, {
-      method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }),
+  function togglePendingEditor(userId: string) {
+    setPendingEditorIds(prev => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId); else next.add(userId)
+      return next
     })
-    if (res.ok) {
-      setProjectEditorIds(prev => {
-        const next = new Set(prev)
-        if (isEditor) next.delete(userId); else next.add(userId)
-        return next
-      })
-    } else {
-      const err = await res.json().catch(() => ({}))
-      alert(err.error || 'Eroare la actualizarea accesului.')
+  }
+
+  async function saveAccessChanges() {
+    setSavingAccess(true)
+    const toAdd = Array.from(pendingEditorIds).filter(id => !projectEditorIds.has(id))
+    const toRemove = Array.from(projectEditorIds).filter(id => !pendingEditorIds.has(id))
+    try {
+      await Promise.all([
+        ...toAdd.map(userId => fetch(`/api/projects/${selectedProject}/editors`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })),
+        ...toRemove.map(userId => fetch(`/api/projects/${selectedProject}/editors`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })),
+      ])
+      setProjectEditorIds(new Set(pendingEditorIds))
+      setShowAccessPanel(false)
+    } catch {
+      alert('Eroare la salvarea accesului.')
     }
+    setSavingAccess(false)
   }
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => setCurrentUser(d.user)).catch(() => {})
   }, [])
+
+  const [canEditMap, setCanEditMap] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    if (!currentUser || !reports.length) return
+    const uniqueProjectIds = Array.from(new Set(reports.map((r: any) => r.project_id).filter(Boolean)))
+    Promise.all(uniqueProjectIds.map(pid =>
+      fetch(`/api/projects/${pid}/can-edit`).then(r => r.json()).then(d => [pid, !!d.allowed] as [string, boolean]).catch(() => [pid, false] as [string, boolean])
+    )).then(entries => setCanEditMap(Object.fromEntries(entries)))
+  }, [currentUser, reports])
 
   function requireLogin(): boolean {
     if (currentUser) return true
@@ -64,6 +103,15 @@ export default function DashboardPage() {
       router.push('/login?returnTo=/dashboard')
     }
     return false
+  }
+
+  function requireEditRights(projectId: string): boolean {
+    if (!requireLogin()) return false
+    if (!canEditMap[projectId]) {
+      alert('Nu ai drepturi de editare pentru acest proiect. Doar creatorul proiectului, un editor asignat sau un admin poate edita.')
+      return false
+    }
+    return true
   }
 
 
@@ -130,6 +178,9 @@ export default function DashboardPage() {
         <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <Link href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ color: 'rgba(255,255,255,0.65)', textDecoration: 'none', fontSize: 13 }}>+ New Project</Link>
           <Link href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+          {currentUser?.role === 'admin' && (
+            <button onClick={openActivityLog} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>📋 Activity Log</button>
+          )}
           {currentUser ? (
             <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null) }}
               style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>{currentUser.name} · Logout</button>
@@ -221,7 +272,7 @@ export default function DashboardPage() {
               {currentUser?.role === 'admin' && selectedProject !== 'all' && (
                 <button onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
               )}
-              <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+              <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (selectedProject !== 'all' ? !requireEditRights(selectedProject) : !requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
             </div>
           </div>
 
@@ -236,10 +287,10 @@ export default function DashboardPage() {
                   <>
                     <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Bifează utilizatorii care pot edita acest proiect. Creatorul proiectului și adminii au acces automat.</p>
                     {allUsers.map(u => {
-                      const isEditor = projectEditorIds.has(u.id)
+                      const isChecked = pendingEditorIds.has(u.id)
                       return (
                         <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-                          <input type="checkbox" checked={isEditor} onChange={() => toggleEditor(u.id, isEditor)} />
+                          <input type="checkbox" checked={isChecked} onChange={() => togglePendingEditor(u.id)} />
                           <div>
                             <div style={{ fontSize: 13, color: MCORE_DARK }}>{u.name} {u.role === 'admin' && <span style={{ color: ORANGE, fontSize: 11 }}>(admin)</span>}</div>
                             <div style={{ fontSize: 11, color: '#9ca3af' }}>{u.email}</div>
@@ -247,7 +298,34 @@ export default function DashboardPage() {
                         </label>
                       )
                     })}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+                      <button onClick={() => setShowAccessPanel(false)} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Anulează</button>
+                      <button onClick={saveAccessChanges} disabled={savingAccess} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>{savingAccess ? 'Se salvează...' : 'OK'}</button>
+                    </div>
                   </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showActivityLog && (
+            <div onClick={() => setShowActivityLog(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>📋 Activity Log</h3>
+                  <button onClick={() => setShowActivityLog(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
+                </div>
+                {loadingLog ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Se încarcă...</div> : activityLog.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#9ca3af' }}>Niciun eveniment înregistrat încă.</div>
+                ) : (
+                  activityLog.map((entry: any) => (
+                    <div key={entry.id} style={{ padding: '10px 4px', borderBottom: '1px solid #f3f4f6' }}>
+                      <div style={{ fontSize: 13, color: MCORE_DARK }}>{entry.details}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                        {new Date(entry.created_at).toLocaleString('ro-RO')} {entry.project?.name && `· ${entry.project.name}`}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
@@ -290,7 +368,7 @@ export default function DashboardPage() {
                                   : <span title="Has attachments" style={{ fontSize: 14 }}>📎</span>
                               })()}
                               <Link href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
-                              <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
+                              <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
                             </div>
                           </td>
                         </tr>
@@ -326,7 +404,7 @@ export default function DashboardPage() {
                         <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
-                        <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
+                        <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
                       </div>
                     </div>
                   )
