@@ -344,9 +344,17 @@ export default function ReportPage() {
   const contractingTotal = daysBetween(contractingStart, contractingFinish)
   const constructionTotal = daysBetween(constructionStart, constructionFinishEstimated)
 
-  // Estimated at contract finish & trend finish date
+  // Estimated at contract finish, trend finish date, and delay status.
+  // The trend is now computed from the FULL cumulative history via linear regression
+  // (not just the last two reports), so a single unusually slow/fast week doesn't
+  // swing the projection. It's then blended with a "Contract Plan" ideal line
+  // (straight 0% at contract signing → 100% at contract finish) to produce a
+  // 3-state delay signal: on track / behind-but-recovering / behind-and-worsening.
   let estimatedAtContractFinish: number | null = null
   let trendFinishDate: string | null = null
+  let trendWeeklySlope: number | null = null
+  let idealProgressNow: number | null = null
+  let delayStatus: 'onTrack' | 'recovering' | 'worsening' | null = null
 
   // Only use reports up through the one currently being viewed — an older report
   // shouldn't show progress from weeks that come after it.
@@ -354,31 +362,72 @@ export default function ReportPage() {
   const visibleReports = currentReportIdx >= 0 ? allReports.slice(0, currentReportIdx + 1) : allReports
 
   const cumulatedData = visibleReports.map(r => computeProgress(r))
+  const cumulatedDates = visibleReports.map(r => r.period_end)
+
+  // Least-squares linear regression over ALL cumulative progress points, in %/day.
+  function regressionSlopePerDay(dates: string[], values: number[]): number {
+    if (dates.length < 2) return 0
+    const x0 = new Date(dates[0]).getTime()
+    const xs = dates.map(d => (new Date(d).getTime() - x0) / 86400000)
+    const n = xs.length
+    const sumX = xs.reduce((a, b) => a + b, 0)
+    const sumY = values.reduce((a, b) => a + b, 0)
+    const sumXY = xs.reduce((s, x, i) => s + x * values[i], 0)
+    const sumXX = xs.reduce((s, x) => s + x * x, 0)
+    const denom = n * sumXX - sumX * sumX
+    if (denom === 0) return 0
+    return (n * sumXY - sumX * sumY) / denom
+  }
 
   if (cumulatedData.length >= 2) {
     const lastProgress = cumulatedData[cumulatedData.length - 1]
-    const prevProgress = cumulatedData[cumulatedData.length - 2]
-    const weeklyGain = lastProgress - prevProgress
-    const lastDate = visibleReports[visibleReports.length - 1]?.period_end
+    const lastDate = cumulatedDates[cumulatedDates.length - 1]
+    trendWeeklySlope = regressionSlopePerDay(cumulatedDates, cumulatedData) * 7
 
-    if (weeklyGain > 0 && lastDate) {
-      const weeksTo100 = (100 - lastProgress) / weeklyGain
+    if (trendWeeklySlope > 0 && lastDate) {
+      const weeksTo100 = (100 - lastProgress) / trendWeeklySlope
       const finishMs = new Date(lastDate).getTime() + weeksTo100 * 7 * 86400000
       trendFinishDate = new Date(finishMs).toISOString().split('T')[0]
     }
 
     if (contractFinish) {
       const weeksToFinish = daysBetween(lastDate, contractFinish) / 7
-      const weeklyGainSafe = Math.max(weeklyGain, 0)
-      estimatedAtContractFinish = Math.min(100, cumulatedData[cumulatedData.length - 1] + weeklyGainSafe * weeksToFinish)
+      const weeklyGainSafe = Math.max(trendWeeklySlope, 0)
+      estimatedAtContractFinish = Math.min(100, lastProgress + weeklyGainSafe * weeksToFinish)
+    }
+
+    if (contractStart && contractFinish) {
+      const totalDays = daysBetween(contractStart, contractFinish)
+      const elapsedDays = daysBetween(contractStart, lastDate)
+      idealProgressNow = totalDays > 0 ? Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100)) : null
+    }
+
+    if (idealProgressNow !== null) {
+      const gap = lastProgress - idealProgressNow
+      if (gap >= 0) {
+        delayStatus = 'onTrack'
+      } else if (contractFinish) {
+        const weeksRemaining = Math.max(daysBetween(lastDate, contractFinish) / 7, 0.01)
+        const requiredWeeklySlope = (100 - lastProgress) / weeksRemaining
+        delayStatus = trendWeeklySlope > requiredWeeklySlope ? 'recovering' : 'worsening'
+      } else {
+        delayStatus = 'worsening'
+      }
     }
   }
 
   function getTrendColor() {
-    if (estimatedAtContractFinish === null) return '#aaaaaa'
-    if (estimatedAtContractFinish >= 99) return '#86efac'
-    if (estimatedAtContractFinish < 90) return '#fca5a5'
+    if (delayStatus === 'onTrack') return '#86efac'
+    if (delayStatus === 'recovering') return '#fbbf24'
+    if (delayStatus === 'worsening') return '#fca5a5'
     return '#aaaaaa'
+  }
+
+  function getDelayBadge(): { icon: string; text: string; color: string } | null {
+    if (delayStatus === 'onTrack') return { icon: '🟢', text: 'On track vs. contract', color: '#86efac' }
+    if (delayStatus === 'recovering') return { icon: '🟠', text: 'Behind, but recovering', color: '#fbbf24' }
+    if (delayStatus === 'worsening') return { icon: '🔴', text: 'Behind, falling further behind', color: '#fca5a5' }
+    return null
   }
 
   // Extract embedded images from Office Open XML files (xlsx/docx are ZIP archives —
@@ -628,15 +677,21 @@ export default function ReportPage() {
       const trendFull: (number|null)[] = [...Array(cumData.length - 1).fill(null)]
       const trendColor = getTrendColor()
 
-      if (cumData.length >= 2 && constructionFinishEstimated) {
+      // Extend the label axis far enough to show both the regression trend AND the
+      // contract plan line in full, whichever of the two finishes later.
+      const trendFinishTarget = constructionFinishEstimated ? new Date(constructionFinishEstimated) : null
+      const contractFinishTarget = contractFinish ? new Date(contractFinish) : null
+      const extendUntil = [trendFinishTarget, contractFinishTarget]
+        .filter((d): d is Date => d !== null)
+        .sort((a, b) => b.getTime() - a.getTime())[0] || null
+
+      if (cumData.length >= 2 && extendUntil) {
         const lastProgress = cumData[cumData.length - 1]
-        const prevProgress = cumData[cumData.length - 2]
-        const weeklyGain = Math.max(lastProgress - prevProgress, 0)
+        const weeklyGain = Math.max(trendWeeklySlope ?? 0, 0)
         trendFull.push(lastProgress)
         let current = new Date(labels[labels.length - 1])
         let currentProg = lastProgress
-        const finishDate = new Date(constructionFinishEstimated)
-        while (current < finishDate && currentProg < 100) {
+        while (current < extendUntil && currentProg < 100) {
           current = new Date(current.getTime() + 7 * 86400000)
           currentProg = Math.min(100, currentProg + weeklyGain)
           allLabels.push(current.toISOString().split('T')[0])
@@ -649,6 +704,18 @@ export default function ReportPage() {
       const cumulatedFull = [...cumData, ...Array(allLabels.length - labels.length).fill(null)]
       const actualFull = [...actualData, ...Array(allLabels.length - labels.length).fill(null)]
 
+      // Contract Plan (ideal) line — straight 0% at contract signing → 100% at contract finish.
+      let idealFull: (number|null)[] | null = null
+      if (contractStart && contractFinish) {
+        const totalDays = daysBetween(contractStart, contractFinish)
+        if (totalDays > 0) {
+          idealFull = allLabels.map(label => {
+            const elapsed = daysBetween(contractStart, label)
+            return parseFloat(Math.min(100, Math.max(0, (elapsed / totalDays) * 100)).toFixed(2))
+          })
+        }
+      }
+
       // Trend finish annotation line index
       const trendFinishIdx = trendFinishDate ? allLabels.indexOf(trendFinishDate) : -1
 
@@ -660,7 +727,8 @@ export default function ReportPage() {
             datasets: [
               { label: 'Cumulated Progress', data: cumulatedFull, borderColor: ORANGE, backgroundColor: 'rgba(212,106,40,0.12)', borderWidth: 2.5, pointBackgroundColor: ORANGE, pointRadius: 4, tension: 0.35, fill: true, yAxisID: 'y' },
               { label: 'Actual Progress', data: actualFull, borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.05)', borderWidth: 1.5, pointBackgroundColor: BLUE, pointRadius: 3, tension: 0.35, fill: false, yAxisID: 'y' },
-              { label: 'Trend', data: trendFull, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' }
+              { label: 'Trend', data: trendFull, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' },
+              ...(idealFull ? [{ label: 'Contract Plan', data: idealFull, borderColor: '#9ca3af', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, tension: 0, fill: false, yAxisID: 'y' }] : [])
             ]
           },
           options: {
@@ -769,7 +837,7 @@ export default function ReportPage() {
       document.head.appendChild(s)
     }
     loadChartJS()
-  }, [id, allReports, constructionFinishEstimated, contractFinish, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart, activityProgress, editing])
+  }, [id, allReports, constructionFinishEstimated, contractFinish, contractStart, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart, activityProgress, editing])
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Loading...</div>
   const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
@@ -1217,6 +1285,12 @@ ${photosHtml}
               {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
               </p>}
+              {getDelayBadge() && (
+                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                  <span style={{ fontSize: 15 }}>{getDelayBadge()!.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: getDelayBadge()!.color }}>{getDelayBadge()!.text}</span>
+                </div>
+              )}
               {estimatedAtContractFinish !== null && (
                 <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
                   <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Estimated at contract finish:</span>
@@ -1260,6 +1334,11 @@ ${photosHtml}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#e5e7eb' }}>Works Progress · {report.project?.name}</h2>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {getDelayBadge() && (
+                  <div style={{ fontSize: 11, color: getDelayBadge()!.color, fontWeight: 700, background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
+                    {getDelayBadge()!.icon} {getDelayBadge()!.text}
+                  </div>
+                )}
                 {trendFinishDate && (
                   <div style={{ fontSize: 11, color: trendColor, fontWeight: 600, background: 'rgba(255,255,255,0.08)', padding: '4px 10px', borderRadius: 6 }}>
                     📅 Trend finish: {trendFinishDate}
@@ -1507,5 +1586,6 @@ ${photosHtml}
     </div>
   )
 }
+
 
 
