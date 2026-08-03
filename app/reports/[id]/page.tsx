@@ -673,13 +673,33 @@ export default function ReportPage() {
       const cumData = visibleReports.map(r => computeProgress(r))
       const actualData = cumData.map((v, i) => i === 0 ? v : parseFloat((v - cumData[i-1]).toFixed(2)))
 
-      const allLabels = [...labels]
+      let allLabels = [...labels]
       const trendFull: (number|null)[] = [...Array(cumData.length - 1).fill(null)]
       const trendColor = getTrendColor()
 
-      // Extend the label axis (independent of when the trend hits 100%) far enough to
-      // show both the trend projection AND the full contract plan line, whichever of
-      // the two finishes later.
+      // Extend the axis BACKWARD to the contract signing date, so the Contract Plan
+      // line visibly starts at 0% instead of appearing to start mid-way.
+      let backwardCount = 0
+      if (contractStart) {
+        const contractStartDate = new Date(contractStart)
+        const backwardLabels: string[] = []
+        let current = new Date(labels[0])
+        while (current > contractStartDate) {
+          const prev = new Date(current.getTime() - 7 * 86400000)
+          if (prev <= contractStartDate) {
+            backwardLabels.unshift(contractStart)
+            break
+          }
+          backwardLabels.unshift(prev.toISOString().split('T')[0])
+          current = prev
+        }
+        backwardCount = backwardLabels.length
+        allLabels = [...backwardLabels, ...allLabels]
+      }
+
+      // Extend the axis FORWARD (independent of when the trend hits 100%) far enough
+      // to show both the trend projection AND the full contract plan line, whichever
+      // of the two finishes later.
       const trendFinishTarget = constructionFinishEstimated ? new Date(constructionFinishEstimated) : null
       const contractFinishTarget = contractFinish ? new Date(contractFinish) : null
       const extendUntil = [trendFinishTarget, contractFinishTarget]
@@ -693,6 +713,7 @@ export default function ReportPage() {
           allLabels.push(current.toISOString().split('T')[0])
         }
       }
+      const forwardCount = allLabels.length - backwardCount - labels.length
 
       if (cumData.length >= 2) {
         const lastProgress = cumData[cumData.length - 1]
@@ -701,7 +722,7 @@ export default function ReportPage() {
         trendFull.push(lastProgress)
         // Trend goes flat at 100% once reached, but the axis (and the Contract Plan
         // line) keeps going — they're no longer coupled to the same stopping point.
-        for (let i = labels.length; i < allLabels.length; i++) {
+        for (let i = 0; i < forwardCount; i++) {
           currentProg = Math.min(100, currentProg + weeklyGain)
           trendFull.push(parseFloat(currentProg.toFixed(2)))
         }
@@ -709,10 +730,12 @@ export default function ReportPage() {
         trendFull.push(cumData[cumData.length - 1] ?? null)
       }
 
-      const cumulatedFull = [...cumData, ...Array(allLabels.length - labels.length).fill(null)]
-      const actualFull = [...actualData, ...Array(allLabels.length - labels.length).fill(null)]
+      const cumulatedFull = [...Array(backwardCount).fill(null), ...cumData, ...Array(forwardCount).fill(null)]
+      const actualFull = [...Array(backwardCount).fill(null), ...actualData, ...Array(forwardCount).fill(null)]
+      const trendFullPadded = [...Array(backwardCount).fill(null), ...trendFull]
 
       // Contract Plan (ideal) line — straight 0% at contract signing → 100% at contract finish.
+      // No datalabels on this one — it's meant to read as a simple reference line.
       let idealFull: (number|null)[] | null = null
       if (contractStart && contractFinish) {
         const totalDays = daysBetween(contractStart, contractFinish)
@@ -735,8 +758,8 @@ export default function ReportPage() {
             datasets: [
               { label: 'Cumulated Progress', data: cumulatedFull, borderColor: ORANGE, backgroundColor: 'rgba(212,106,40,0.12)', borderWidth: 2.5, pointBackgroundColor: ORANGE, pointRadius: 4, tension: 0.35, fill: true, yAxisID: 'y' },
               { label: 'Actual Progress', data: actualFull, borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.05)', borderWidth: 1.5, pointBackgroundColor: BLUE, pointRadius: 3, tension: 0.35, fill: false, yAxisID: 'y' },
-              { label: 'Trend', data: trendFull, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' },
-              ...(idealFull ? [{ label: 'Contract Plan', data: idealFull, borderColor: '#9ca3af', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, tension: 0, fill: false, yAxisID: 'y' }] : [])
+              { label: 'Trend', data: trendFullPadded, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' },
+              ...(idealFull ? [{ label: 'Contract Plan', data: idealFull, borderColor: '#9ca3af', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, tension: 0, fill: false, yAxisID: 'y', datalabels: { display: false } }] : [])
             ]
           },
           options: {
