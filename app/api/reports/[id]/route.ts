@@ -44,12 +44,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   try {
     const { data: existingReport } = await supabase.from('reports').select('project_id').eq('id', params.id).single()
-    if (!existingReport) return NextResponse.json({ error: 'Raport negasit' }, { status: 404 })
+    if (!existingReport) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
     const allowed = await canEditProject(user, existingReport.project_id)
-    if (!allowed) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+    if (!allowed) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
 
     const body = await req.json()
     const update: Record<string, any> = { updated_at: new Date().toISOString() }
@@ -70,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         if (error) throw error
       }
     }
-    await logActivity(user, 'report_edited', `${user.name} a editat un raport`, { project_id: existingReport.project_id, report_id: params.id })
+    await logActivity(user, 'report_edited', `${user.name} edited a report`, { project_id: existingReport.project_id, report_id: params.id })
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -79,16 +79,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   try {
     const { data: existingReport } = await supabase.from('reports').select('project_id').eq('id', params.id).single()
-    if (!existingReport) return NextResponse.json({ error: 'Raport negasit' }, { status: 404 })
+    if (!existingReport) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
     const allowed = await canEditProject(user, existingReport.project_id)
-    if (!allowed) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+    if (!allowed) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
 
     const { error } = await supabase.from('reports').delete().eq('id', params.id)
     if (error) throw error
-    await logActivity(user, 'report_deleted', `${user.name} a șters un raport`, { project_id: existingReport.project_id })
+    await logActivity(user, 'report_deleted', `${user.name} deleted a report`, { project_id: existingReport.project_id })
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
