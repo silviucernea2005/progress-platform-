@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
   try {
     const { photos } = await req.json()
     if (!Array.isArray(photos) || !photos.length) return NextResponse.json({ error: 'No photos provided' }, { status: 400 })
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
   try {
     const { order } = await req.json()
     if (!Array.isArray(order) || !order.length) return NextResponse.json({ error: 'order must be a non-empty array' }, { status: 400 })
@@ -110,7 +110,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
+  if (!(await canEditReport(user, params.id))) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
   try {
     const body = await req.json().catch(() => ({} as any))
 
