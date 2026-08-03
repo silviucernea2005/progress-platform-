@@ -242,9 +242,11 @@ function NewReportForm() {
     const data = await res.json()
     if (data.ok) {
       if (photos.length) {
-        await fetch(`/api/reports/${data.id}/photos`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos })
-        }).catch(() => {})
+        for (const photo of photos) {
+          await fetch(`/api/reports/${data.id}/photos`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: [photo] })
+          }).catch(() => {})
+        }
       }
       router.push(`/reports/${data.id}`)
     } else alert('Error: ' + data.error)
