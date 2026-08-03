@@ -24,7 +24,7 @@ function LoginForm() {
       if (!res.ok) { setError(data.error); return }
       router.push('/dashboard')
     } catch {
-      setError('Eroare de retea')
+      setError('Network error')
     } finally {
       setLoading(false)
     }
@@ -54,7 +54,7 @@ function LoginForm() {
           {error && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 12px', color: '#dc2626', fontSize: 14, marginBottom: 16 }}>{error}</div>}
           <button type="submit" disabled={loading}
             style={{ width: '100%', background: '#185FA5', color: '#fff', border: 'none', borderRadius: 8, padding: '11px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            {loading ? 'Se verifica...' : 'Autentificare'}
+            {loading ? 'Checking...' : 'Sign in'}
           </button>
         </form>
       </div>
@@ -69,4 +69,5 @@ export default function LoginPage() {
     </Suspense>
   )
 }
+
 
