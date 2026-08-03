@@ -19,6 +19,7 @@ export default function ReportPage() {
   const [editing, setEditing] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [canEdit, setCanEdit] = useState(false)
   const [worksDone, setWorksDone] = useState('')
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
@@ -76,19 +77,32 @@ export default function ReportPage() {
     fetch('/api/auth/me').then(r => r.json()).then(d => { setCurrentUser(d.user); setAuthChecked(true) }).catch(() => setAuthChecked(true))
   }, [])
 
+  // Real per-project permission check — being logged in isn't enough, you need to be
+  // the project's creator, an assigned editor, or an admin.
+  useEffect(() => {
+    if (!report?.project_id || !currentUser) { setCanEdit(false); return }
+    fetch(`/api/projects/${report.project_id}/can-edit`).then(r => r.json()).then(d => setCanEdit(!!d.allowed)).catch(() => setCanEdit(false))
+  }, [report?.project_id, currentUser])
+
   function requireLogin(): boolean {
-    if (currentUser) return true
-    if (confirm('Trebuie să te autentifici ca să poți edita. Mergi la pagina de login?')) {
-      router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)
+    if (!currentUser) {
+      if (confirm('Trebuie să te autentifici ca să poți edita. Mergi la pagina de login?')) {
+        router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)
+      }
+      return false
     }
-    return false
+    if (!canEdit) {
+      alert('Nu ai drepturi de editare pentru acest proiect. Doar creatorul proiectului, un editor asignat sau un admin poate edita.')
+      return false
+    }
+    return true
   }
 
   // Arriving from the dashboard's "Edit" link (?edit=1) — only auto-open editing if actually logged in
   useEffect(() => {
     if (!report || !authChecked) return
-    if (searchParams.get('edit') === '1' && currentUser) setEditing(true)
-  }, [report, authChecked, currentUser])
+    if (searchParams.get('edit') === '1' && currentUser && canEdit) setEditing(true)
+  }, [report, authChecked, currentUser, canEdit])
 
   useEffect(() => {
     fetch(`/api/reports/${id}`).then(r => r.json()).then(async data => {
@@ -1022,7 +1036,7 @@ ${photosHtml}
         <div className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
           <button onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
-          <button onClick={() => { if (requireLogin()) toggleFullEdit() }} style={btn(editing ? ORANGE : 'rgba(255,255,255,0.1)')}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+          <button onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
             {showExportMenu && (
@@ -1037,8 +1051,8 @@ ${photosHtml}
               </div>
             )}
           </div>
-          <button onClick={() => { if (requireLogin()) handleNewReport() }} style={btn(ORANGE)}>+ New Report</button>
-          <button onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={btn('#dc2626')}>🗑 Delete</button>
+          <button onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(ORANGE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
+          <button onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn('#dc2626'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
           {authChecked && (
             currentUser ? (
@@ -1463,5 +1477,6 @@ ${photosHtml}
     </div>
   )
 }
+
 
 
