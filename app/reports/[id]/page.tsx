@@ -672,126 +672,81 @@ export default function ReportPage() {
       const labels = visibleReports.map(r => r.period_end)
       const cumData = visibleReports.map(r => computeProgress(r))
       const actualData = cumData.map((v, i) => i === 0 ? v : parseFloat((v - cumData[i-1]).toFixed(2)))
-
-      let allLabels = [...labels]
-      const trendFull: (number|null)[] = [...Array(cumData.length - 1).fill(null)]
       const trendColor = getTrendColor()
 
-      // Extend the axis BACKWARD to the contract signing date, so the Contract Plan
-      // line visibly starts at 0% instead of appearing to start mid-way.
-      let backwardCount = 0
-      if (contractStart) {
-        const contractStartDate = new Date(contractStart)
-        const backwardLabels: string[] = []
-        let current = new Date(labels[0])
-        while (current > contractStartDate) {
-          const prev = new Date(current.getTime() - 7 * 86400000)
-          if (prev <= contractStartDate) {
-            backwardLabels.unshift(contractStart)
-            break
-          }
-          backwardLabels.unshift(prev.toISOString().split('T')[0])
-          current = prev
-        }
-        backwardCount = backwardLabels.length
-        allLabels = [...backwardLabels, ...allLabels]
-      }
-
-      // Extend the axis FORWARD (independent of when the trend hits 100%) far enough
-      // to show both the trend projection AND the full contract plan line, whichever
-      // of the two finishes later.
+      // Real linear time axis (day-offset from an epoch) instead of evenly-spaced
+      // categories. A category axis gives every label the same pixel width even when
+      // the real dates aren't evenly spaced (e.g. Adjud RP's first two reports are 19
+      // days apart, the rest are weekly) — that's what made straight lines like
+      // Contract Plan look "broken"/kinked. On a linear axis, equal real time always
+      // gets equal pixel width, so a mathematically straight line renders straight.
       const trendFinishTarget = constructionFinishEstimated ? new Date(constructionFinishEstimated) : null
       const contractFinishTarget = contractFinish ? new Date(contractFinish) : null
       const extendUntil = [trendFinishTarget, contractFinishTarget]
         .filter((d): d is Date => d !== null)
         .sort((a, b) => b.getTime() - a.getTime())[0] || null
+      const extendUntilStr = extendUntil ? extendUntil.toISOString().split('T')[0] : null
 
-      if (extendUntil) {
-        let current = new Date(labels[labels.length - 1])
-        while (current < extendUntil) {
-          current = new Date(current.getTime() + 7 * 86400000)
-          allLabels.push(current.toISOString().split('T')[0])
-        }
-      }
-      const forwardCount = allLabels.length - backwardCount - labels.length
+      const candidateDates = [labels[0], contractStart, labels[labels.length - 1], contractFinish, extendUntilStr]
+        .filter((d): d is string => !!d)
+      const epoch = candidateDates.reduce((min, d) => (new Date(d) < new Date(min) ? d : min), candidateDates[0])
+      const toOffset = (dateStr: string) => daysBetween(epoch, dateStr)
+      const formatOffset = (days: number) => new Date(new Date(epoch).getTime() + days * 86400000).toISOString().split('T')[0]
 
+      const cumulatedPoints = labels.map((l, i) => ({ x: toOffset(l), y: cumData[i] }))
+      const actualPoints = labels.map((l, i) => ({ x: toOffset(l), y: actualData[i] }))
+
+      // Trend — straight projection from the last real point (using the full-history
+      // regression slope) out to either its own 100% finish date, or the display
+      // window edge if it never reaches 100% within that window.
+      const trendPoints: { x: number; y: number }[] = []
       if (cumData.length >= 2) {
         const lastProgress = cumData[cumData.length - 1]
-        const weeklyGain = Math.max(trendWeeklySlope ?? 0, 0)
-        let currentProg = lastProgress
-        trendFull.push(lastProgress)
-        // Trend goes flat at 100% once reached, but the axis (and the Contract Plan
-        // line) keeps going — they're no longer coupled to the same stopping point.
-        for (let i = 0; i < forwardCount; i++) {
-          currentProg = Math.min(100, currentProg + weeklyGain)
-          trendFull.push(parseFloat(currentProg.toFixed(2)))
-        }
-      } else {
-        trendFull.push(cumData[cumData.length - 1] ?? null)
-      }
-
-      const cumulatedFull = [...Array(backwardCount).fill(null), ...cumData, ...Array(forwardCount).fill(null)]
-      const actualFull = [...Array(backwardCount).fill(null), ...actualData, ...Array(forwardCount).fill(null)]
-      const trendFullPadded = [...Array(backwardCount).fill(null), ...trendFull]
-
-      // Contract Plan (ideal) line — straight 0% at contract signing → 100% at contract finish.
-      // No datalabels on this one — it's meant to read as a simple reference line.
-      let idealFull: (number|null)[] | null = null
-      if (contractStart && contractFinish) {
-        const totalDays = daysBetween(contractStart, contractFinish)
-        if (totalDays > 0) {
-          idealFull = allLabels.map(label => {
-            const elapsed = daysBetween(contractStart, label)
-            return parseFloat(Math.min(100, Math.max(0, (elapsed / totalDays) * 100)).toFixed(2))
-          })
+        trendPoints.push({ x: toOffset(labels[labels.length - 1]), y: lastProgress })
+        if (trendWeeklySlope && trendWeeklySlope > 0 && trendFinishDate) {
+          trendPoints.push({ x: toOffset(trendFinishDate), y: 100 })
+        } else if (extendUntilStr) {
+          trendPoints.push({ x: toOffset(extendUntilStr), y: lastProgress })
         }
       }
 
-      // Trend finish annotation line index
-      const trendFinishIdx = trendFinishDate ? allLabels.indexOf(trendFinishDate) : -1
+      // Contract Plan (ideal) line — just two anchor points (0% at signing, 100% at
+      // contract finish). No datalabels — meant to read as a simple reference line.
+      let idealPoints: { x: number; y: number }[] | null = null
+      if (contractStart && contractFinish && daysBetween(contractStart, contractFinish) > 0) {
+        idealPoints = [{ x: toOffset(contractStart), y: 0 }, { x: toOffset(contractFinish), y: 100 }]
+      }
+
+      const axisMax = toOffset(extendUntilStr || labels[labels.length - 1])
+      const axisMin = Math.min(0, toOffset(labels[0]))
 
       if (mainChartRef.current) {
         chartInstances.current.push(new Chart(mainChartRef.current, {
           type: 'line',
           data: {
-            labels: allLabels,
             datasets: [
-              { label: 'Cumulated Progress', data: cumulatedFull, borderColor: ORANGE, backgroundColor: 'rgba(212,106,40,0.12)', borderWidth: 2.5, pointBackgroundColor: ORANGE, pointRadius: 4, tension: 0.35, fill: true, yAxisID: 'y' },
-              { label: 'Actual Progress', data: actualFull, borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.05)', borderWidth: 1.5, pointBackgroundColor: BLUE, pointRadius: 3, tension: 0.35, fill: false, yAxisID: 'y' },
-              { label: 'Trend', data: trendFullPadded, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0.35, fill: false, yAxisID: 'y' },
-              ...(idealFull ? [{ label: 'Contract Plan', data: idealFull, borderColor: '#9ca3af', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, tension: 0, fill: false, yAxisID: 'y', datalabels: { display: false } }] : [])
+              { label: 'Cumulated Progress', data: cumulatedPoints, borderColor: ORANGE, backgroundColor: 'rgba(212,106,40,0.12)', borderWidth: 2.5, pointBackgroundColor: ORANGE, pointRadius: 4, tension: 0.35, fill: true, yAxisID: 'y' },
+              { label: 'Actual Progress', data: actualPoints, borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.05)', borderWidth: 1.5, pointBackgroundColor: BLUE, pointRadius: 3, tension: 0.35, fill: false, yAxisID: 'y' },
+              { label: 'Trend', data: trendPoints, borderColor: trendColor, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, tension: 0, fill: false, yAxisID: 'y' },
+              ...(idealPoints ? [{ label: 'Contract Plan', data: idealPoints, borderColor: '#9ca3af', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, tension: 0, fill: false, yAxisID: 'y', datalabels: { display: false } }] : [])
             ]
           },
           options: {
             responsive: true,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'nearest', intersect: false },
             plugins: {
               legend: { display: true, position: 'top', labels: { color: '#e5e7eb', font: { size: 11 }, boxWidth: 18 } },
-              tooltip: { callbacks: { label: (ctx: any) => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y}%` : '' } },
-              annotation: trendFinishIdx >= 0 ? {
-                annotations: {
-                  trendLine: {
-                    type: 'line',
-                    xMin: trendFinishIdx,
-                    xMax: trendFinishIdx,
-                    borderColor: 'rgba(200,200,200,0.5)',
-                    borderWidth: 1,
-                    borderDash: [4, 4],
-                    label: {
-                      display: true,
-                      content: `Finish: ${trendFinishDate}`,
-                      position: 'start',
-                      color: '#ccc',
-                      font: { size: 10 }
-                    }
-                  }
+              tooltip: {
+                callbacks: {
+                  title: (items: any) => items[0] ? formatOffset(items[0].parsed.x) : '',
+                  label: (ctx: any) => ctx.parsed.y !== null ? ` ${ctx.dataset.label}: ${ctx.parsed.y}%` : ''
                 }
-              } : {}
+              }
             },
             scales: {
               y: { min: 0, max: 100, position: 'left', ticks: { callback: (v: any) => v + '%', color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.06)' } },
               y2: { min: 0, max: 100, position: 'right', ticks: { callback: (v: any) => v + '%', color: '#9ca3af' }, grid: { display: false } },
-              x: { ticks: { maxRotation: 30, font: { size: 10 }, color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+              x: { type: 'linear', min: axisMin, max: axisMax, ticks: { maxRotation: 30, font: { size: 10 }, color: '#9ca3af', callback: (v: any) => formatOffset(v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
           }
         }))
