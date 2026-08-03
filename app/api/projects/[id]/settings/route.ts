@@ -40,8 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // Body: { dates?: {...}, weights?: {...} } — only the keys provided get updated, the rest are preserved
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
-  if (!(await canEditProject(user, params.id))) return NextResponse.json({ error: 'Nu ai drepturi de editare pentru acest proiect.' }, { status: 403 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  if (!(await canEditProject(user, params.id))) return NextResponse.json({ error: 'You don't have edit rights on this project.' }, { status: 403 })
   try {
     const body = await req.json()
     const { data: existing } = await supabase.from('project_settings').select('*').eq('project_id', params.id).maybeSingle()
