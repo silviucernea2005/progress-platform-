@@ -127,15 +127,20 @@ export default function DashboardPage() {
     localStorage.setItem('dashboard_selected_project', selectedProject)
   }, [selectedProject])
 
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/projects').then(r => r.json()),
-      fetch('/api/reports').then(r => r.json()),
-    ]).then(([p, r]) => {
+  async function loadDashboard() {
+    try {
+      const [p, r] = await Promise.all([
+        fetch('/api/projects').then(res => res.json()),
+        fetch('/api/reports').then(res => res.json()),
+      ])
       setProjects(Array.isArray(p) ? p : [])
       setReports(Array.isArray(r) ? r : [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    } catch {}
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadDashboard()
   }, [])
 
   const filteredReports = selectedProject === 'all' ? reports : reports.filter(r => r.project_id === selectedProject)
@@ -165,7 +170,7 @@ export default function DashboardPage() {
     <div style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
       {/* HEADER */}
       <header className="s7-header-row" style={{ position: 'relative', background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div onClick={loadDashboard} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
           <div style={{ background: BLUE, borderRadius: 8, padding: '4px 10px', fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>S7</div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>Square 7</div>
@@ -311,7 +316,7 @@ export default function DashboardPage() {
 
           {showActivityLog && (
             <div onClick={() => setShowActivityLog(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
+              <div onClick={e => e.stopPropagation()} style={{ background: '#f3f4f6', borderRadius: 12, padding: 24, width: '100%', maxWidth: 560, maxHeight: '80vh', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>📋 Activity Log</h3>
                   <button onClick={() => setShowActivityLog(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
@@ -320,7 +325,7 @@ export default function DashboardPage() {
                   <div style={{ fontSize: 13, color: '#9ca3af' }}>No events logged yet.</div>
                 ) : (
                   activityLog.map((entry: any) => (
-                    <div key={entry.id} style={{ padding: '10px 4px', borderBottom: '1px solid #f3f4f6' }}>
+                    <div key={entry.id} style={{ padding: '10px 4px', borderBottom: '1px solid #e5e7eb' }}>
                       <div style={{ fontSize: 13, color: MCORE_DARK }}>{entry.details}</div>
                       <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
                         {new Date(entry.created_at).toLocaleString('en-US')} {entry.project?.name && `· ${entry.project.name}`}
@@ -416,5 +421,6 @@ export default function DashboardPage() {
     </div>
   )
 }
+
 
 
