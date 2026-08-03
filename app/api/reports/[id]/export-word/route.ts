@@ -51,7 +51,7 @@ function dataUrlToBuffer(dataUrl: string): Buffer | null {
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   try {
     const body = await req.json().catch(() => ({}))
     const mainChartImage: string | null = body?.mainChartImage || null
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .from('reports')
       .select('*, project:projects(id,name,location,client), activities:report_activities(*, activity:activities(*))')
       .eq('id', params.id).single()
-    if (error || !report) return NextResponse.json({ error: 'Raport negasit' }, { status: 404 })
+    if (error || !report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
     const [{ data: settings }, { data: allReports }, { data: photoRows }] = await Promise.all([
       supabase.from('project_settings').select('weights').eq('project_id', report.project_id).maybeSingle(),
@@ -203,4 +203,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
