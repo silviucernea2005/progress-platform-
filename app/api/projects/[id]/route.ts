@@ -37,15 +37,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
-  if (!user) return NextResponse.json({ error: 'Autentificare necesara' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   const allowed = await canEditProject(user, params.id)
-  if (!allowed) return NextResponse.json({ error: 'Doar creatorul proiectului sau un admin poate sterge acest proiect.' }, { status: 403 })
+  if (!allowed) return NextResponse.json({ error: 'Only the project's creator or an admin can delete this project.' }, { status: 403 })
   try {
     const { data: existing } = await supabase.from('projects').select('name').eq('id', params.id).maybeSingle()
     const { error } = await supabase.from('projects').delete().eq('id', params.id)
     if (error) throw error
     try {
-      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'project_deleted', details: `${user.name} a șters proiectul "${existing?.name || ''}"` })
+      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'project_deleted', details: `${user.name} deleted project "${existing?.name || ''}"` })
     } catch {}
     return NextResponse.json({ ok: true })
   } catch (e: any) {
