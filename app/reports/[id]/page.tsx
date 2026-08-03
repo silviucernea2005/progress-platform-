@@ -169,11 +169,18 @@ export default function ReportPage() {
             if (legacyPhotos) {
               const parsed = JSON.parse(legacyPhotos)
               if (Array.isArray(parsed) && parsed.length) {
-                const uploaded = await fetch(`/api/reports/${id}/photos`, {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: parsed })
-                }).then(r => r.json())
-                if (Array.isArray(uploaded)) {
-                  setPhotos(uploaded.map((p: any) => ({ id: p.id, url: p.url })))
+                const uploadedAll: any[] = []
+                for (const photo of parsed) {
+                  try {
+                    const res = await fetch(`/api/reports/${id}/photos`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: [photo] })
+                    })
+                    const uploaded = await res.json()
+                    if (Array.isArray(uploaded) && uploaded.length) uploadedAll.push(...uploaded)
+                  } catch {}
+                }
+                if (uploadedAll.length) {
+                  setPhotos(uploadedAll.map((p: any) => ({ id: p.id, url: p.url })))
                   localStorage.removeItem(`report_photos_${id}`)
                 }
               }
@@ -494,14 +501,22 @@ export default function ReportPage() {
     }
     try {
       if (newPhotos.length) {
-        const uploaded = await fetch(`/api/reports/${id}/photos`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: newPhotos })
-        }).then(r => r.json())
-        if (Array.isArray(uploaded)) {
-          setPhotos(prev => [...prev, ...uploaded.map((p: any) => ({ id: p.id, url: p.url }))])
-        } else {
-          alert('A apărut o eroare la salvarea pozelor pe server. Încearcă din nou.')
+        const uploadedAll: any[] = []
+        let failedCount = 0
+        for (const photo of newPhotos) {
+          try {
+            const res = await fetch(`/api/reports/${id}/photos`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: [photo] })
+            })
+            const uploaded = await res.json()
+            if (Array.isArray(uploaded) && uploaded.length) uploadedAll.push(...uploaded)
+            else failedCount++
+          } catch {
+            failedCount++
+          }
         }
+        if (uploadedAll.length) setPhotos(prev => [...prev, ...uploadedAll.map((p: any) => ({ id: p.id, url: p.url }))])
+        if (failedCount > 0) alert(`S-au salvat ${uploadedAll.length} din ${newPhotos.length} poze. ${failedCount} au eșuat — încearcă să le încarci din nou.`)
       }
     } catch {
       alert('A apărut o eroare de rețea la salvarea pozelor. Verifică conexiunea și încearcă din nou.')
@@ -1477,6 +1492,5 @@ ${photosHtml}
     </div>
   )
 }
-
 
 
