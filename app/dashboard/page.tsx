@@ -109,7 +109,7 @@ export default function DashboardPage() {
   function requireEditRights(projectId: string): boolean {
     if (!requireLogin()) return false
     if (!canEditMap[projectId]) {
-      alert('You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.')
+      alert("You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.")
       return false
     }
     return true
