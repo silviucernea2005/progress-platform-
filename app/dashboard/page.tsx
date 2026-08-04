@@ -153,6 +153,14 @@ export default function DashboardPage() {
     return rep.activities.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
   }
 
+  // reports is already ordered most-recent-first (see /api/reports), so the first
+  // match is the latest report — shows who's currently responsible at a glance,
+  // before even opening the project.
+  function getResponsible(projectId: string): string | null {
+    const rep = reports.find((r: any) => r.project_id === projectId)
+    return rep?.responsible || null
+  }
+
   function getReportProgress(r: any) {
     const acts = r.activities || []
     return acts.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
@@ -267,6 +275,7 @@ export default function DashboardPage() {
                     </div>
                   )}
                   {p.location && <div style={{ fontSize: 10, color: '#d1d5db', marginTop: 1 }}>{p.location}</div>}
+                  {getResponsible(p.id) && <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>👤 {getResponsible(p.id)}</div>}
                 </div>
               )
             })}
