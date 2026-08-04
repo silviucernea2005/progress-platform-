@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
 const MCORE_RED = '#A70202'
+const NAV_BG = '#22304A'
 const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
@@ -170,7 +171,7 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', flexDirection: 'column' }}>
       {/* HEADER */}
-      <header className="s7-header-row" style={{ position: 'relative', background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+      <header className="s7-header-row" style={{ position: 'relative', background: NAV_BG, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div onClick={loadDashboard} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
           <div style={{ background: MCORE_RED, borderRadius: 6, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 17, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
@@ -183,18 +184,24 @@ export default function DashboardPage() {
         </div>
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
-        <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
-          <Link className="s7-btn" href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
-          {currentUser?.role === 'admin' && (
-            <button onClick={openActivityLog} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>📋 Activity Log</button>
-          )}
+        <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', marginRight: 4 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '5px 8px' }}>
+            <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
+            <Link className="s7-btn" href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
+            {currentUser?.role === 'admin' && (
+              <button className="s7-btn" onClick={openActivityLog} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>📋 Activity Log</button>
+            )}
+          </div>
+          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)' }} />
           {currentUser ? (
-            <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null) }}
-              style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>{currentUser.name} · Logout</button>
+            <button className="s7-btn" onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null) }}
+              style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: '#fff', cursor: 'pointer', fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              👤 {currentUser.name} <span style={{ opacity: 0.6 }}>· Logout</span>
+            </button>
           ) : (
-            <button onClick={() => router.push('/login?returnTo=/dashboard')}
-              style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 11, padding: '4px 10px' }}>Login</button>
+            <button className="s7-btn" onClick={() => router.push('/login?returnTo=/dashboard')}
+              style={{ background: BLUE, border: 'none', borderRadius: 20, color: '#fff', cursor: 'pointer', fontSize: 12, padding: '6px 14px', fontWeight: 600 }}>👤 Login</button>
           )}
         </nav>
       </header>
