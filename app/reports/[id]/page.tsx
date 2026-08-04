@@ -53,6 +53,19 @@ export default function ReportPage() {
   const [showActionsMenu, setShowActionsMenu] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showMiniCharts, setShowMiniCharts] = useState(false)
+  const [chartFullscreen, setChartFullscreen] = useState(false)
+
+  // Chart.js has a built-in resize observer, but forcing it explicitly avoids any
+  // edge cases when the container snaps to fullscreen (position: fixed) on mobile.
+  useEffect(() => {
+    const t = setTimeout(() => chartInstances.current.forEach(c => c?.resize()), 50)
+    return () => clearTimeout(t)
+  }, [chartFullscreen])
+
+  useEffect(() => {
+    document.body.style.overflow = chartFullscreen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [chartFullscreen])
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
   const [rearrangeMode, setRearrangeMode] = useState(false)
@@ -817,6 +830,7 @@ export default function ReportPage() {
           },
           options: {
             responsive: true,
+            maintainAspectRatio: false,
             interaction: { mode: 'nearest', intersect: false },
             plugins: {
               legend: { display: true, position: 'top', labels: { color: '#e5e7eb', font: { size: 11 }, boxWidth: 18 } },
@@ -1440,8 +1454,10 @@ ${photosHtml}
 
         {/* MAIN CHART — dark bg */}
         {allReports.length >= 1 && (
-          <div style={{ background: GRAY_CHART, borderRadius: 12, padding: 20, marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={chartFullscreen
+            ? { background: GRAY_CHART, position: 'fixed', inset: 0, zIndex: 999, padding: 20, overflowY: 'auto' }
+            : { background: GRAY_CHART, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#e5e7eb' }}>Works Progress · {report.project?.name}</h2>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 {getDelayBadge() && (
@@ -1459,9 +1475,15 @@ ${photosHtml}
                     At contract finish: {estimatedAtContractFinish.toFixed(1)}%
                   </div>
                 )}
+                <button onClick={() => setChartFullscreen(!chartFullscreen)}
+                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#e5e7eb', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>
+                  {chartFullscreen ? '✕ Close' : '🔍 Expand'}
+                </button>
               </div>
             </div>
-            <canvas ref={mainChartRef} height={175} />
+            <div style={{ height: chartFullscreen ? 'calc(100vh - 100px)' : 260 }}>
+              <canvas ref={mainChartRef} />
+            </div>
           </div>
         )}
 
