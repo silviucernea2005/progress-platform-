@@ -5,6 +5,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 const MCORE_DARK = '#1A1A2A'
 const MCORE_RED = '#A70202'
 const NAV_BG = '#22304A'
+const TEAL = '#0D9488'
+const DELETE_RED = '#B3261E'
 const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
@@ -25,6 +27,7 @@ export default function ReportPage() {
   const [worksDone, setWorksDone] = useState('')
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
+  const [responsible, setResponsible] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDates, setShowDates] = useState(false)
@@ -47,8 +50,9 @@ export default function ReportPage() {
   const [addingCat, setAddingCat] = useState(false)
   const [showWeights, setShowWeights] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showActionsMenu, setShowActionsMenu] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [showMiniCharts, setShowMiniCharts] = useState(true)
+  const [showMiniCharts, setShowMiniCharts] = useState(false)
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
   const [rearrangeMode, setRearrangeMode] = useState(false)
@@ -112,6 +116,7 @@ export default function ReportPage() {
       setWorksDone(data.works_done || '')
       setWorksPlanned(data.works_planned || '')
       setRedFlags(data.red_flags || '')
+      setResponsible(data.responsible || '')
       setPeriodStart(data.period_start || '')
       setPeriodEnd(data.period_end || '')
       setActivityProgress(Object.fromEntries((data.activities || []).map((a: any) => [a.activity_id, a.progress])))
@@ -277,6 +282,7 @@ export default function ReportPage() {
         body: JSON.stringify({
           period_start: periodStart, period_end: periodEnd,
           works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags,
+          responsible: responsible || null,
           activities: [
             ...acts.map((a: any) => ({ activity_id: a.activity_id, progress: activityProgress[a.activity_id] ?? a.progress })),
             ...customActivities.map((ca: any) => ({ activity_id: ca.id, progress: activityProgress[ca.id] ?? 0 })),
@@ -295,7 +301,7 @@ export default function ReportPage() {
       const newRows = customActivities.map((ca: any) => ({ activity_id: ca.id, progress: activityProgress[ca.id] ?? 0, activity: ca }))
       setReport((r: any) => ({
         ...r, period_start: periodStart, period_end: periodEnd,
-        works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags,
+        works_done: worksDone, works_planned: worksPlanned, red_flags: redFlags, responsible,
         activities: [...(r.activities || []).map((a: any) => ({ ...a, progress: activityProgress[a.activity_id] ?? a.progress })), ...newRows]
       }))
       setCustomActivities([])
@@ -1201,44 +1207,56 @@ ${photosHtml}
             <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.2 }}>SQUARE 7</div>
           </div>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
-          <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Progress Platform</span>
+          <span style={{ fontWeight: 500, fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
         <div className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="s7-nav-divider" style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', marginRight: 4 }} />
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '4px 6px' }}>
-            <button className="s7-btn" onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
-            <button className="s7-btn" onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
-          </div>
 
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '4px 6px' }}>
-            <button className="s7-btn" onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
-            {currentUser?.role === 'admin' && (
-              <button className="s7-btn" onClick={toggleWeightsEdit} style={btn(editingWeights ? ORANGE : 'rgba(255,255,255,0.1)')}>⚖️ Weights</button>
+          <div style={{ position: 'relative' }}>
+            <button className="s7-btn" onClick={() => setShowActionsMenu(!showActionsMenu)} style={btn('rgba(255,255,255,0.12)')}>⚙️ Actions ▾</button>
+            {showActionsMenu && (
+              <div onMouseLeave={() => setShowActionsMenu(false)}
+                style={{ position: 'absolute', top: '110%', left: 0, background: '#fff', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 190 }}>
+                <button onClick={() => { setShowDates(!showDates); setShowActionsMenu(false) }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
+                <button onClick={() => { setShowMiniCharts(!showMiniCharts); setShowActionsMenu(false) }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
+                <div style={{ height: 1, background: '#f0f0f0' }} />
+                <button onClick={() => { setShowActionsMenu(false); if (requireLogin()) toggleFullEdit() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: editing ? ORANGE : MCORE_DARK, fontWeight: editing ? 700 : 400, background: 'none', border: 'none', cursor: 'pointer', opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+                {currentUser?.role === 'admin' && (
+                  <button onClick={() => { setShowActionsMenu(false); toggleWeightsEdit() }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: editingWeights ? ORANGE : MCORE_DARK, fontWeight: editingWeights ? 700 : 400, background: 'none', border: 'none', cursor: 'pointer' }}>⚖️ Weights</button>
+                )}
+              </div>
             )}
-            <div style={{ position: 'relative' }}>
-              <button className="s7-btn" onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
-              {showExportMenu && (
-                <div onMouseLeave={() => setShowExportMenu(false)}
-                  style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
-                  <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportWordClientSide() }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📄 Word</button>
-                  <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
-                  <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportExcel() }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📊 Excel</button>
-                </div>
-              )}
-            </div>
-            <button className="s7-btn" onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(BLUE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
           </div>
 
-          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
-          <button className="s7-btn" onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn('#dc2626'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
+          <div style={{ position: 'relative' }}>
+            <button className="s7-btn" onClick={() => setShowExportMenu(!showExportMenu)} style={btn(TEAL)}>📦 Export ▾</button>
+            {showExportMenu && (
+              <div onMouseLeave={() => setShowExportMenu(false)}
+                style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
+                <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportWordClientSide() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📄 Word</button>
+                <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
+                <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportExcel() }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📊 Excel</button>
+              </div>
+            )}
+          </div>
+
+          <button className="s7-btn" onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(BLUE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
 
           <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
-          <button className="s7-btn" onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
+          <button className="s7-btn" onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn(DELETE_RED), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
+
+          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
+          <button className="s7-btn" onClick={() => router.push('/dashboard')}
+            style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: 20, color: '#fff', cursor: 'pointer', fontSize: 12, padding: '6px 14px' }}>← Dashboard</button>
           {authChecked && (
             currentUser ? (
               <button className="s7-btn" onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null); setEditing(false); setEditingWeights(false); setEditingPeriod(false) }}
@@ -1355,13 +1373,15 @@ ${photosHtml}
         {/* REPORT SWITCHER — jump between this project's reports. Live page only, never exported. */}
         {allReports.length > 1 && (
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 11, color: '#6b7280', marginRight: 8 }}>📋 Report:</label>
-            <select value={String(id)} onChange={e => router.push(`/reports/${e.target.value}`)}
-              style={{ border: '1px solid #d1d5db', borderRadius: 7, padding: '6px 10px', fontSize: 12, color: MCORE_DARK, background: '#fff', cursor: 'pointer' }}>
-              {[...allReports].sort((a: any, b: any) => (b.period_end || '').localeCompare(a.period_end || '')).map((r: any) => (
-                <option key={r.id} value={r.id}>{r.period_start} – {r.period_end}</option>
-              ))}
-            </select>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 20, padding: '5px 12px 5px 14px' }}>
+              <span style={{ fontSize: 13 }}>🗂️</span>
+              <select value={String(id)} onChange={e => router.push(`/reports/${e.target.value}`)}
+                style={{ border: 'none', outline: 'none', fontSize: 12, fontWeight: 600, color: MCORE_DARK, background: 'transparent', cursor: 'pointer' }}>
+                {[...allReports].sort((a: any, b: any) => (b.period_end || '').localeCompare(a.period_end || '')).map((r: any) => (
+                  <option key={r.id} value={r.id}>{r.period_start} – {r.period_end}</option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
 
@@ -1371,6 +1391,7 @@ ${photosHtml}
             <div>
               <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>{report.project?.name}</h1>
               <p style={{ color: 'rgba(255,255,255,0.65)', marginTop: 4, fontSize: 13 }}>{report.period_start} – {report.period_end}</p>
+              {responsible && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>👤 Responsible: {responsible}</p>}
               {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
               </p>}
@@ -1502,6 +1523,17 @@ ${photosHtml}
             <span style={{ fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>Weekly Progress (this period)</span>
             <span style={{ fontSize: 18, fontWeight: 700, color: ORANGE }}>+{weeklyProgress}%</span>
           </div>
+        </div>
+
+        {/* RESPONSIBLE */}
+        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>👤 Responsible:</span>
+          {editing ? (
+            <input value={responsible} onChange={e => setResponsible(e.target.value)} placeholder="e.g. Horia Ghitescu"
+              style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 12, outline: 'none' }} />
+          ) : (
+            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>{responsible || '—'}</span>
+          )}
         </div>
 
         {/* TEXT SECTIONS */}
