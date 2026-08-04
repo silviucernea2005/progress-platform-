@@ -35,6 +35,30 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
 }
 
+// Editing a project's basic info (name/location/client) is admin-only — unlike edit
+// rights on reports/settings, which creators and assigned editors also have.
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await requireAuth(req)
+  if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  if (user.role !== 'admin') return NextResponse.json({ error: 'Only an admin can edit project details.' }, { status: 403 })
+  try {
+    const body = await req.json()
+    const update: Record<string, any> = {}
+    if (body.name !== undefined) update.name = body.name
+    if (body.location !== undefined) update.location = body.location
+    if (body.client !== undefined) update.client = body.client
+    if (Object.keys(update).length === 0) return NextResponse.json({ ok: true })
+    const { error } = await supabase.from('projects').update(update).eq('id', params.id)
+    if (error) throw error
+    try {
+      await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'project_edited', details: `${user.name} edited project details`, project_id: params.id })
+    } catch {}
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
@@ -52,3 +76,4 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
