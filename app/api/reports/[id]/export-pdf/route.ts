@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: Arial, sans-serif; color: #1A1A2A; background: #fff; }
   .header { background: #1A1A2A; color: white; padding: 24px 32px; display:flex; justify-content:space-between; align-items:center; }
-  .logo { font-size: 22px; font-weight: 900; background: #185FA5; padding: 6px 14px; border-radius: 8px; }
+  .logo { font-size: 18px; font-weight: 900; background: #A70202; width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
   .logo-sub { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-top: 2px; }
   .score-box { background: #2C2C3E; border-radius: 12px; padding: 20px 28px; margin: 24px; display:flex; justify-content:space-between; align-items:center; color:white; }
   .score-num { font-size: 48px; font-weight: 800; color: #D46A28; }
@@ -60,10 +60,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 <div class="header">
   <div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo">S7</div>
+      <div class="logo">M</div>
       <div>
-        <div style="font-weight:700;font-size:14px">Square 7</div>
-        <div class="logo-sub">PART OF M.CORE</div>
+        <div style="font-weight:800;font-size:15px">M°Core</div>
+        <div style="width:36px;height:2px;background:#A70202;margin:3px 0"></div>
+        <div class="logo-sub">SQUARE 7</div>
       </div>
     </div>
   </div>
@@ -129,7 +130,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 </div>
 
 <div class="footer">
-  Square 7 · Part of M.Core · Progress Platform · Generated ${new Date().toLocaleDateString('en-GB')}
+  M°Core · Square 7 · Progress Platform · Generated ${new Date().toLocaleDateString('en-GB')}
 </div>
 
 <script>window.onload = () => window.print()</script>
@@ -145,3 +146,4 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
