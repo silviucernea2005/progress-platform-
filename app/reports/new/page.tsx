@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
 const MCORE_RED = '#A70202'
+const NAV_BG = '#22304A'
 const BLUE = '#185FA5'
 const ORANGE = '#D46A28'
 
@@ -292,7 +293,7 @@ function NewReportForm() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
-      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 100, background: NAV_BG, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{ background: MCORE_RED, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
@@ -303,13 +304,16 @@ function NewReportForm() {
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
           <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>New Report</span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} style={{ display: 'none' }} />
-          <button className="s7-btn" onClick={() => fileRef.current?.click()} disabled={uploading}
-            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer' }}>
-            {uploading ? 'Processing...' : '📤 Upload Excel'}
-          </button>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Back</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)', marginRight: 2 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '4px 6px' }}>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} style={{ display: 'none' }} />
+            <button className="s7-btn" onClick={() => fileRef.current?.click()} disabled={uploading}
+              style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer' }}>
+              {uploading ? 'Processing...' : '📤 Upload Excel'}
+            </button>
+          </div>
+          <button className="s7-btn" onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontSize: 12, padding: '6px 14px' }}>← Back</button>
         </div>
       </header>
 
