@@ -257,30 +257,6 @@ export default function DashboardPage() {
             </select>
           </div>
 
-          {/* Filter the project list below by Responsible and/or Client */}
-          {projects.length > 0 && (
-            <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 7, padding: '6px 8px', fontSize: 11, color: '#6b7280', background: '#fff' }}>
-                <option value="all">👤 All responsibles</option>
-                {Array.from(new Set(projects.map((p: any) => getProjectResponsible(p)).filter(Boolean))).sort().map((name: any) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </select>
-              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
-                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 7, padding: '6px 8px', fontSize: 11, color: '#6b7280', background: '#fff' }}>
-                <option value="all">🏢 All clients</option>
-                {Array.from(new Set(projects.map((p: any) => p.client).filter(Boolean))).sort().map((client: any) => (
-                  <option key={client} value={client}>{client}</option>
-                ))}
-              </select>
-              {(filterResponsible !== 'all' || filterClient !== 'all') && (
-                <button onClick={() => { setFilterResponsible('all'); setFilterClient('all') }}
-                  style={{ fontSize: 10.5, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>✕ Clear filters</button>
-              )}
-            </div>
-          )}
-
           <div className="s7-dash-projectlist">
           <div onClick={() => setSelectedProject('all')}
             style={{ padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: selectedProject === 'all' ? 600 : 400, color: selectedProject === 'all' ? MCORE_DARK : '#374151', background: selectedProject === 'all' ? '#f5f5f3' : 'transparent', borderLeft: selectedProject === 'all' ? `3px solid ${MCORE_DARK}` : '3px solid transparent' }}>
@@ -356,7 +332,29 @@ export default function DashboardPage() {
                 </span>
               )}
             </h2>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {projects.length > 0 && (
+                <>
+                  <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
+                    style={{ border: '1px solid #e5e7eb', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: '#6b7280', background: '#fff' }}>
+                    <option value="all">👤 All responsibles</option>
+                    {Array.from(new Set(projects.map((p: any) => getProjectResponsible(p)).filter(Boolean))).sort().map((name: any) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                  <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                    style={{ border: '1px solid #e5e7eb', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: '#6b7280', background: '#fff' }}>
+                    <option value="all">🏢 All clients</option>
+                    {Array.from(new Set(projects.map((p: any) => p.client).filter(Boolean))).sort().map((client: any) => (
+                      <option key={client} value={client}>{client}</option>
+                    ))}
+                  </select>
+                  {(filterResponsible !== 'all' || filterClient !== 'all') && (
+                    <button onClick={() => { setFilterResponsible('all'); setFilterClient('all') }}
+                      style={{ fontSize: 12, color: BLUE, background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
+                  )}
+                </>
+              )}
               {currentUser?.role === 'admin' && selectedProject !== 'all' && (
                 <button className="s7-btn" onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
               )}
