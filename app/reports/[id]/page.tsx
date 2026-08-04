@@ -905,7 +905,13 @@ export default function ReportPage() {
     loadChartJS()
   }, [id, allReports, constructionFinishEstimated, contractFinish, contractStart, weights, tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish, contractingStart, contractingReviewLegal, contractingFinish, constructionProceedNotice, constructionStart, activityProgress, editing])
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>Loading...</div>
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', padding: 20 }}>
+      <div className="s7-skeleton" style={{ height: 56, borderRadius: 8, marginBottom: 20 }} />
+      <div className="s7-skeleton" style={{ height: 140, borderRadius: 12, marginBottom: 16, maxWidth: 900, margin: '0 auto 16px' }} />
+      <div className="s7-skeleton" style={{ height: 320, borderRadius: 12, maxWidth: 900, margin: '0 auto' }} />
+    </div>
+  )
   const inp = { border: '1px solid #d1d5db', borderRadius: 6, padding: '5px 8px', fontSize: 12, width: '100%', boxSizing: 'border-box' as any }
   const lbl = { display: 'block' as any, fontSize: 11, color: '#6b7280', marginBottom: 3 }
   const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 } as any)
@@ -1180,7 +1186,7 @@ ${photosHtml}
   const weeklyProgress = parseFloat((currentCumulated - prevCumulated).toFixed(2))
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f3', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
 
       {/* STICKY HEADER */}
       <header className="s7-header-row" style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
@@ -1196,14 +1202,14 @@ ${photosHtml}
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
         <div className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
-          <button onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
-          <button onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+          <button className="s7-btn" onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
+          <button className="s7-btn" onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
+          <button className="s7-btn" onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
           {currentUser?.role === 'admin' && (
-            <button onClick={toggleWeightsEdit} style={btn(editingWeights ? ORANGE : 'rgba(255,255,255,0.1)')}>⚖️ Weights</button>
+            <button className="s7-btn" onClick={toggleWeightsEdit} style={btn(editingWeights ? ORANGE : 'rgba(255,255,255,0.1)')}>⚖️ Weights</button>
           )}
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
+            <button className="s7-btn" onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
             {showExportMenu && (
               <div onMouseLeave={() => setShowExportMenu(false)}
                 style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
@@ -1216,8 +1222,8 @@ ${photosHtml}
               </div>
             )}
           </div>
-          <button onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(ORANGE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
-          <button onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn('#dc2626'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
+          <button className="s7-btn" onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(BLUE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
+          <button className="s7-btn" onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn('#dc2626'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
           <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
           {authChecked && (
             currentUser ? (
@@ -1241,7 +1247,7 @@ ${photosHtml}
 
         {/* EDIT REPORT PERIOD */}
         {editingPeriod && (
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+          <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Report Period</h2>
             <div className="s7-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 420 }}>
               <div>
@@ -1259,10 +1265,10 @@ ${photosHtml}
 
         {/* PROJECT DATES — collapsible */}
         {showDates && (
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+          <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Project Dates</h2>
-              <button onClick={saveDates} style={btn(BLUE)}>Save & Hide</button>
+              <button className="s7-btn" onClick={saveDates} style={btn(BLUE)}>Save & Hide</button>
             </div>
             <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {[
@@ -1287,7 +1293,7 @@ ${photosHtml}
 
         {/* WEIGHTS EDITOR */}
         {editingWeights && (
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+          <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Activity Weights</h2>
               <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#ecfdf5' : '#fef2f2', color: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#065f46' : '#dc2626' }}>
@@ -1388,7 +1394,7 @@ ${photosHtml}
             { ref: contractingChartRef, total: contractingTotal, label: 'Contracting' },
             { ref: constructionChartRef, total: constructionTotal, label: 'Construction' },
           ].map(item => (
-            <div key={item.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div key={item.label} className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
               <canvas ref={item.ref} height={160} />
               {item.total > 0 && <div style={{ textAlign: 'center', fontSize: 11, color: '#6b7280', marginTop: 4 }}>Total: {item.total} days</div>}
             </div>
@@ -1423,7 +1429,7 @@ ${photosHtml}
         )}
 
         {/* ACTIVITIES */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Activities Progress</h2>
             <button onClick={() => setShowWeights(!showWeights)}
@@ -1489,7 +1495,7 @@ ${photosHtml}
             { label: '→ Works planned', value: worksPlanned, setter: setWorksPlanned, color: BLUE_DARK, key: 'planned' },
             { label: '🚩 Red Flags', value: redFlags, setter: setRedFlags, color: '#7f1d1d', key: 'flags' },
           ].map(section => (
-            <div key={section.key} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18 }}>
+            <div key={section.key} className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18 }}>
               <h3 style={{ fontSize: 13, fontWeight: 600, color: section.color, marginBottom: 10 }}>{section.label}</h3>
               {editing ? (
                 <textarea value={section.value} onChange={e => section.setter(e.target.value)} rows={5}
@@ -1502,7 +1508,7 @@ ${photosHtml}
         </div>
 
         {/* PHOTOS / ATTACHMENTS */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Site Photos & Attachments</h2>
 
           {photos.length > 0 && (
@@ -1562,18 +1568,18 @@ ${photosHtml}
               {deletePhotoMode ? (
                 <>
                   <span style={{ fontSize: 12, color: '#6b7280' }}>{selectedPhotoIds.size} selected</span>
-                  <button onClick={() => { setDeletePhotoMode(false); setSelectedPhotoIds(new Set()) }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
-                  <button onClick={deleteSelectedPhotos} disabled={!selectedPhotoIds.size} style={btn('#dc2626')}>🗑 Delete selected</button>
+                  <button className="s7-btn" onClick={() => { setDeletePhotoMode(false); setSelectedPhotoIds(new Set()) }} style={btn('#f3f4f6', '#374151')}>Cancel</button>
+                  <button className="s7-btn" onClick={deleteSelectedPhotos} disabled={!selectedPhotoIds.size} style={btn('#dc2626')}>🗑 Delete selected</button>
                 </>
               ) : rearrangeMode ? (
                 <>
                   <span style={{ fontSize: 12, color: '#6b7280' }}>Drag photos with your mouse (or use ‹ ›) to reorder</span>
-                  <button onClick={savePhotoOrder} style={btn(BLUE)}>✓ Done rearranging</button>
+                  <button className="s7-btn" onClick={savePhotoOrder} style={btn(BLUE)}>✓ Done rearranging</button>
                 </>
               ) : (
                 photos.length > 0 && (
                   <div style={{ position: 'relative' }}>
-                    <button onClick={() => setShowPhotoMenu(!showPhotoMenu)} style={btn('#fef2f2', '#dc2626')}>🗑 Photo actions ▾</button>
+                    <button className="s7-btn" onClick={() => setShowPhotoMenu(!showPhotoMenu)} style={btn('#fef2f2', '#dc2626')}>🗑 Photo actions ▾</button>
                     {showPhotoMenu && (
                       <div onMouseLeave={() => setShowPhotoMenu(false)}
                         style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 180 }}>
@@ -1613,7 +1619,7 @@ ${photosHtml}
         {editing && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
             <button onClick={toggleFullEdit} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-            <button onClick={saveAllEdits} disabled={saving || savingPeriod} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
+            <button className="s7-btn" onClick={saveAllEdits} disabled={saving || savingPeriod} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>
               {saving || savingPeriod ? 'Saving...' : '💾 Save all changes'}
             </button>
           </div>
