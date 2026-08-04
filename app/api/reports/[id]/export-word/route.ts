@@ -142,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const children: any[] = [
-      new Paragraph({ children: [new TextRun({ text: 'SQUARE 7 · PART OF M.CORE', bold: true, size: 18, color: '6B7280', font: 'Arial' })] }),
+      new Paragraph({ children: [new TextRun({ text: 'M°CORE · SQUARE 7', bold: true, size: 18, color: '6B7280', font: 'Arial' })] }),
       new Paragraph({ spacing: { after: 100 }, children: [new TextRun({ text: 'Progress Report', size: 20, color: '6B7280', font: 'Arial' })] }),
       new Paragraph({ children: [new TextRun({ text: report.project?.name || '', bold: true, size: 40, font: 'Arial' })] }),
       new Paragraph({ children: [new TextRun({ text: `${report.period_start} – ${report.period_end}`, size: 22, color: '6B7280', font: 'Arial' })] }),
@@ -203,5 +203,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
