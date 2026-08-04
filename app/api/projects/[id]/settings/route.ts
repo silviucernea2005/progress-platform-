@@ -30,14 +30,14 @@ async function canEditProject(user: any, projectId: string): Promise<boolean> {
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await supabase
     .from('project_settings')
-    .select('dates, weights')
+    .select('dates, weights, responsible')
     .eq('project_id', params.id)
     .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data || { dates: {}, weights: {} }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
+  return NextResponse.json(data || { dates: {}, weights: {}, responsible: null }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
 }
 
-// Body: { dates?: {...}, weights?: {...} } — only the keys provided get updated, the rest are preserved
+// Body: { dates?: {...}, weights?: {...}, responsible?: string|null } — only the keys provided get updated, the rest are preserved
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const user = await requireAuth(req)
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
@@ -49,6 +49,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       project_id: params.id,
       dates: body.dates !== undefined ? body.dates : (existing?.dates || {}),
       weights: body.weights !== undefined ? body.weights : (existing?.weights || {}),
+      responsible: body.responsible !== undefined ? body.responsible : (existing?.responsible ?? null),
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('project_settings').upsert(merged)
@@ -58,5 +59,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
