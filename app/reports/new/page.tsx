@@ -229,6 +229,18 @@ function NewReportForm() {
     fetch('/api/projects').then(r => r.json()).then(d => setProjects(Array.isArray(d) ? d : []))
   }, [])
 
+  // Escape discards this in-progress report (nothing has been saved to the server
+  // yet at this point) and goes back, after confirming.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (confirm('Discard this new report? Nothing will be saved.')) router.back()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   // Load this project's activities (8 standard + any custom categories), merge in
   // saved weight overrides and the progress from the most recent report.
   useEffect(() => {
