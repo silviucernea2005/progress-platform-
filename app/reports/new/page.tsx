@@ -23,11 +23,13 @@ function NewReportForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileRef = useRef<HTMLInputElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [projectId, setProjectId] = useState(searchParams.get('project') || '')
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
   const [worksDone, setWorksDone] = useState('')
+  const [responsible, setResponsible] = useState('')
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
   const [activities, setActivities] = useState(ACTIVITIES.map(a => ({ ...a, progress: 0 })))
@@ -134,10 +136,7 @@ function NewReportForm() {
     })
   }
 
-  async function handlePhotoDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    const files = Array.from(e.dataTransfer.files)
+  async function processPhotoFiles(files: File[]) {
     if (!files.length) return
     setUploadingPhoto(true)
     const newPhotos: string[] = []
@@ -190,6 +189,20 @@ function NewReportForm() {
     } catch {}
     setPhotos(prev => [...prev, ...newPhotos])
     setUploadingPhoto(false)
+  }
+
+  async function handlePhotoDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    await processPhotoFiles(Array.from(e.dataTransfer.files))
+  }
+
+  // Drag & drop doesn't work with touch on mobile — this lets tapping the dropzone
+  // open the native file picker (camera roll / files app) instead.
+  async function handlePhotoInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    await processPhotoFiles(files)
   }
 
   function removeStagedPhoto(index: number) {
@@ -269,6 +282,7 @@ function NewReportForm() {
         works_done: worksDone,
         works_planned: worksPlanned,
         red_flags: redFlags,
+        responsible: responsible || null,
         activities: activities.map(a => ({ activity_id: a.id, progress: a.progress })),
         payments: [],
         created_by: null
@@ -330,9 +344,13 @@ function NewReportForm() {
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div><label style={lbl}>Period start</label><input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inp} /></div>
             <div><label style={lbl}>Period end</label><input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inp} /></div>
+          </div>
+          <div>
+            <label style={lbl}>Responsible (optional)</label>
+            <input value={responsible} onChange={e => setResponsible(e.target.value)} style={inp} placeholder="e.g. Horia Ghitescu" />
           </div>
         </div>
 
@@ -349,17 +367,20 @@ function NewReportForm() {
             <span style={{ fontSize: 22, fontWeight: 700, color: ORANGE }}>{totalProgress.toFixed(2)}%</span>
           </div>
           {activities.map(a => (
-            <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <span style={{ width: 190, fontSize: 13, flexShrink: 0, color: MCORE_DARK }}>{a.name}</span>
-              {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28, flexShrink: 0 }}>{a.weight}%</span>}
-              <input type="range" min={0} max={100} value={a.progress}
-                onChange={e => setActivities(prev => prev.map(x => x.id === a.id ? { ...x, progress: Number(e.target.value) } : x))}
-                style={{ flex: 1, accentColor: ORANGE }} />
-              <input type="number" min={0} max={100} value={a.progress}
-                onChange={e => setActivities(prev => prev.map(x => x.id === a.id ? { ...x, progress: Math.min(100, Math.max(0, Number(e.target.value))) } : x))}
-                onFocus={e => e.target.select()}
-                style={{ width: 56, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'center' }} />
-              <span style={{ fontSize: 11, color: '#9ca3af' }}>%</span>
+            <div key={a.id} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+                <span style={{ fontSize: 13, color: MCORE_DARK }}>{a.name}{showWeights && <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 6 }}>({a.weight}% weight)</span>}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: ORANGE }}>{a.progress}%</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input type="range" min={0} max={100} value={a.progress}
+                  onChange={e => setActivities(prev => prev.map(x => x.id === a.id ? { ...x, progress: Number(e.target.value) } : x))}
+                  style={{ flex: 1, accentColor: ORANGE, minWidth: 0 }} />
+                <input type="number" min={0} max={100} value={a.progress}
+                  onChange={e => setActivities(prev => prev.map(x => x.id === a.id ? { ...x, progress: Math.min(100, Math.max(0, Number(e.target.value))) } : x))}
+                  onFocus={e => e.target.select()}
+                  style={{ width: 56, flexShrink: 0, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 13, textAlign: 'center' }} />
+              </div>
             </div>
           ))}
         </div>
@@ -379,16 +400,18 @@ function NewReportForm() {
             </div>
           )}
           <div
+            onClick={() => photoInputRef.current?.click()}
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handlePhotoDrop}
             style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius: 10, padding: 24, textAlign: 'center', background: dragOver ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s', cursor: 'pointer' }}>
+            <input ref={photoInputRef} type="file" multiple accept="image/*,.pdf,.xlsx,.docx,.xls,.doc,video/*,.mp4,.mov,.webm,.m4v" onChange={handlePhotoInputChange} style={{ display: 'none' }} />
             {uploadingPhoto ? (
               <div style={{ color: BLUE, fontSize: 13 }}>Processing files...</div>
             ) : (
               <>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel, Word or video here</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop, or tap to browse — photos, PDF, Excel, Word or video</div>
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
               </>
             )}
