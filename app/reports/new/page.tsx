@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
+const MCORE_RED = '#A70202'
 const BLUE = '#185FA5'
 const ORANGE = '#D46A28'
 
@@ -293,10 +294,11 @@ function NewReportForm() {
     <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
+          <div style={{ background: MCORE_RED, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Square 7</div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', letterSpacing: 1 }}>PART OF M.CORE</div>
+            <span style={{ fontWeight: 800, fontSize: 13, color: '#fff', letterSpacing: 0.2 }}>M°Core</span>
+            <div style={{ width: 36, height: 2, background: MCORE_RED, margin: '2px 0 2px' }} />
+            <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.2 }}>SQUARE 7</div>
           </div>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
           <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>New Report</span>
