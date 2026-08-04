@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [loadingAccess, setLoadingAccess] = useState(false)
 
   const [pendingEditorIds, setPendingEditorIds] = useState<Set<string>>(new Set())
+  const [pendingResponsible, setPendingResponsible] = useState<string>('')
   const [savingAccess, setSavingAccess] = useState(false)
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [activityLog, setActivityLog] = useState<any[]>([])
@@ -47,14 +48,16 @@ export default function DashboardPage() {
     setShowAccessPanel(true)
     setLoadingAccess(true)
     try {
-      const [usersRes, editorsRes] = await Promise.all([
+      const [usersRes, editorsRes, settingsRes] = await Promise.all([
         fetch('/api/users').then(r => r.json()),
         fetch(`/api/projects/${selectedProject}/editors`).then(r => r.json()),
+        fetch(`/api/projects/${selectedProject}/settings`).then(r => r.json()),
       ])
       setAllUsers(Array.isArray(usersRes) ? usersRes : [])
       const ids = new Set<string>(Array.isArray(editorsRes) ? editorsRes.map((e: any) => e.user_id) : [])
       setProjectEditorIds(ids)
       setPendingEditorIds(new Set(ids))
+      setPendingResponsible(settingsRes?.responsible || '')
     } catch {
       alert('Could not load the access list.')
     }
@@ -77,8 +80,12 @@ export default function DashboardPage() {
       await Promise.all([
         ...toAdd.map(userId => fetch(`/api/projects/${selectedProject}/editors`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })),
         ...toRemove.map(userId => fetch(`/api/projects/${selectedProject}/editors`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })),
+        fetch(`/api/projects/${selectedProject}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ responsible: pendingResponsible || null }) }),
       ])
       setProjectEditorIds(new Set(pendingEditorIds))
+      // Optimistic update so the sidebar reflects the new Responsible immediately,
+      // without waiting for a full page reload.
+      setProjects(prev => prev.map((p: any) => p.id === selectedProject ? { ...p, project_settings: [{ responsible: pendingResponsible || null }] } : p))
       setShowAccessPanel(false)
     } catch {
       alert('Error saving access changes.')
@@ -153,12 +160,17 @@ export default function DashboardPage() {
     return rep.activities.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
   }
 
-  // reports is already ordered most-recent-first (see /api/reports), so the first
-  // match is the latest report — shows who's currently responsible at a glance,
-  // before even opening the project.
+  // Project-level "Responsible" (set via Manage Access) is the default shown everywhere.
+  // A report can still override it individually if one was set on that specific report.
+  function getProjectResponsible(p: any): string | null {
+    const settings = Array.isArray(p?.project_settings) ? p.project_settings[0] : p?.project_settings
+    return settings?.responsible || null
+  }
   function getResponsible(projectId: string): string | null {
     const rep = reports.find((r: any) => r.project_id === projectId)
-    return rep?.responsible || null
+    if (rep?.responsible) return rep.responsible
+    const project = projects.find((p: any) => p.id === projectId)
+    return getProjectResponsible(project)
   }
 
   function getReportProgress(r: any) {
@@ -324,6 +336,15 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <>
+                    <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #f3f4f6' }}>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MCORE_DARK, marginBottom: 6 }}>⭐ Responsible for this project</label>
+                      <select value={pendingResponsible} onChange={e => setPendingResponsible(e.target.value)}
+                        style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: 7, padding: '7px 10px', fontSize: 13, color: MCORE_DARK, background: '#fff' }}>
+                        <option value="">— None —</option>
+                        {allUsers.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+                      </select>
+                      <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Shown on the dashboard and on every report for this project (including past ones), unless a report has its own override.</p>
+                    </div>
                     <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Check the users who can edit this project. The project's creator and admins have automatic access.</p>
                     {allUsers.map(u => {
                       const isChecked = pendingEditorIds.has(u.id)
@@ -395,7 +416,7 @@ export default function DashboardPage() {
                         <tr key={r.id} onClick={() => router.push(`/reports/${r.id}`)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
                           <td style={{ padding: '11px 16px', fontWeight: 500, color: MCORE_DARK }}>
                             {r.project?.name || '—'}
-                            {r.responsible && <div style={{ fontSize: 10.5, fontWeight: 400, color: '#9ca3af', marginTop: 1 }}>👤 {r.responsible}</div>}
+                            {(r.responsible || getProjectResponsible(projects.find((p: any) => p.id === r.project_id))) && <div style={{ fontSize: 10.5, fontWeight: 400, color: '#9ca3af', marginTop: 1 }}>👤 {r.responsible || getProjectResponsible(projects.find((p: any) => p.id === r.project_id))}</div>}
                           </td>
                           <td style={{ padding: '11px 16px', color: '#6b7280' }}>{r.period_start} – {r.period_end}</td>
                           <td style={{ padding: '11px 16px' }}>
@@ -444,7 +465,7 @@ export default function DashboardPage() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, color: MCORE_DARK, fontSize: 14 }}>{r.project?.name || '—'}</div>
                           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{r.period_start} – {r.period_end}</div>
-                          {r.responsible && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>👤 {r.responsible}</div>}
+                          {(r.responsible || getProjectResponsible(projects.find((p: any) => p.id === r.project_id))) && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>👤 {r.responsible || getProjectResponsible(projects.find((p: any) => p.id === r.project_id))}</div>}
                         </div>
                         {hasAny && (thumb
                           ? <img src={thumb} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', border: '1px solid #e5e7eb', flexShrink: 0 }} />
