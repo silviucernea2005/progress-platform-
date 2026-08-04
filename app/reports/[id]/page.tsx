@@ -1023,25 +1023,29 @@ export default function ReportPage() {
   async function exportExcel() {
     const XLSX = await import('xlsx')
 
+    const num = (v: any, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback }
+
     const summaryRows = [
       ['Project', report.project?.name || ''],
-      ['Period', `${report.period_start} – ${report.period_end}`],
-      ['Weighted Progress', `${totalProgress.toFixed(2)}%`],
-      ['Weekly Progress', `${weeklyProgress}%`],
+      ['Period', `${report.period_start || ''} – ${report.period_end || ''}`],
+      ['Weighted Progress', `${num(totalProgress).toFixed(2)}%`],
+      ['Weekly Progress', `${num(weeklyProgress)}%`],
       ...(contractFinish ? [['Contract Finish', contractFinish], ['Days Remaining', String(daysBetween(today, contractFinish))]] : []),
-      ...(estimatedAtContractFinish !== null ? [['Estimated at Contract Finish', `${estimatedAtContractFinish.toFixed(1)}%`]] : []),
+      ...(estimatedAtContractFinish !== null ? [['Estimated at Contract Finish', `${num(estimatedAtContractFinish).toFixed(1)}%`]] : []),
       ...(trendFinishDate ? [['Trend Finish Date', trendFinishDate]] : []),
+      ...(responsible || projectResponsible ? [['Responsible', responsible || projectResponsible]] : []),
     ]
 
     const activityRows = [
       ['Activity', 'Weight (%)', 'Progress (%)', 'Contribution (%)', 'Status'],
       ...acts.map((a: any) => {
-        const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
-        const contribution = (a.progress * w / 100).toFixed(2)
-        const status = a.progress === 0 ? 'Not started' : a.progress < 100 ? 'In progress' : 'Completed'
-        return [a.activity?.name || '', w, a.progress, Number(contribution), status]
+        const w = num(getWeight(a.activity_id, a.activity?.default_weight || 0))
+        const progress = num(a.progress)
+        const contribution = num((progress * w / 100).toFixed(2))
+        const status = progress === 0 ? 'Not started' : progress < 100 ? 'In progress' : 'Completed'
+        return [a.activity?.name || '(unnamed)', w, progress, contribution, status]
       }),
-      ['TOTAL', 100, '', Number(totalProgress.toFixed(2)), '']
+      ['TOTAL', 100, '', num(totalProgress).toFixed(2), '']
     ]
 
     const notesRows = [
@@ -1055,7 +1059,18 @@ export default function ReportPage() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(activityRows), 'Activities')
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notesRows), 'Notes')
 
-    XLSX.writeFile(wb, `Raport_${report.project?.name}_${report.period_start}.xlsx`)
+    // XLSX.writeFile() isn't reliable in every browser/bundler setup — building the
+    // file as a byte array and downloading it via a Blob works consistently everywhere.
+    const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+    const blob = new Blob([wbArray], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Raport_${(report.project?.name || 'report').replace(/[^a-z0-9]+/gi, '_')}_${report.period_start || ''}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   // Client-side PDF export — opens in a NEW tab so the current report/dashboard is never lost,
