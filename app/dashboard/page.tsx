@@ -180,7 +180,7 @@ export default function DashboardPage() {
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.4 }}>SQUARE 7</div>
           </div>
           <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
-          <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
+          <span style={{ fontWeight: 500, fontSize: 15, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
@@ -190,7 +190,7 @@ export default function DashboardPage() {
             <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
             <Link className="s7-btn" href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
             {currentUser?.role === 'admin' && (
-              <button className="s7-btn" onClick={openActivityLog} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>📋 Activity Log</button>
+              <button className="s7-btn" onClick={openActivityLog} style={btn('#5C6AC4')}>📋 Activity Log</button>
             )}
           </div>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)' }} />
@@ -384,7 +384,10 @@ export default function DashboardPage() {
                       const prog = getReportProgress(r)
                       return (
                         <tr key={r.id} onClick={() => router.push(`/reports/${r.id}`)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
-                          <td style={{ padding: '11px 16px', fontWeight: 500, color: MCORE_DARK }}>{r.project?.name || '—'}</td>
+                          <td style={{ padding: '11px 16px', fontWeight: 500, color: MCORE_DARK }}>
+                            {r.project?.name || '—'}
+                            {r.responsible && <div style={{ fontSize: 10.5, fontWeight: 400, color: '#9ca3af', marginTop: 1 }}>👤 {r.responsible}</div>}
+                          </td>
                           <td style={{ padding: '11px 16px', color: '#6b7280' }}>{r.period_start} – {r.period_end}</td>
                           <td style={{ padding: '11px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -432,6 +435,7 @@ export default function DashboardPage() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, color: MCORE_DARK, fontSize: 14 }}>{r.project?.name || '—'}</div>
                           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{r.period_start} – {r.period_end}</div>
+                          {r.responsible && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 1 }}>👤 {r.responsible}</div>}
                         </div>
                         {hasAny && (thumb
                           ? <img src={thumb} style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', border: '1px solid #e5e7eb', flexShrink: 0 }} />
