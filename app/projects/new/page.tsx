@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 
 const BLUE = '#185FA5'
 const MCORE_RED = '#A70202'
+const NAV_BG = '#22304A'
 
 export default function NewProjectPage() {
   const router = useRouter()
@@ -162,7 +163,7 @@ export default function NewProjectPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
-      <header style={{ background: '#0C447C', color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header style={{ background: NAV_BG, color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{ background: MCORE_RED, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
@@ -171,7 +172,10 @@ export default function NewProjectPage() {
             <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.2 }}>SQUARE 7</div>
           </div>
         </div>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 14 }}>← Inapoi</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
+          <button className="s7-btn" onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 13, padding: '6px 14px' }}>← Inapoi</button>
+        </div>
       </header>
       <main style={{ maxWidth: 600, margin: '0 auto', padding: '32px 24px' }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, color: '#111827', marginBottom: 8 }}>New Project</h1>
