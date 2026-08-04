@@ -1024,6 +1024,7 @@ export default function ReportPage() {
     const XLSX = await import('xlsx')
 
     const num = (v: any, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback }
+    const splitLines = (text: string) => (text || '').split('\n').map(s => s.trim()).filter(Boolean)
 
     const summaryRows = [
       ['Project', report.project?.name || ''],
@@ -1048,16 +1049,32 @@ export default function ReportPage() {
       ['TOTAL', 100, '', num(totalProgress).toFixed(2), '']
     ]
 
-    const notesRows = [
-      ['Works Completed', worksDone || '—'],
-      ['Works Planned', worksPlanned || '—'],
-      ['Red Flags', redFlags || '—'],
-    ]
+    // One line per row instead of one multi-line cell — the free xlsx library doesn't
+    // reliably write the "wrap text" style, so a squished-together cell was the result.
+    const notesRows: any[][] = []
+    const addSection = (title: string, text: string) => {
+      notesRows.push([title])
+      const lines = splitLines(text)
+      if (lines.length) lines.forEach(line => notesRows.push(['', line]))
+      else notesRows.push(['', '—'])
+      notesRows.push([''])
+    }
+    addSection('Works Completed', worksDone)
+    addSection('Works Planned', worksPlanned)
+    addSection('Red Flags', redFlags)
 
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary')
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(activityRows), 'Activities')
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notesRows), 'Notes')
+    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows)
+    summarySheet['!cols'] = [{ wch: 24 }, { wch: 34 }]
+    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary')
+
+    const activitySheet = XLSX.utils.aoa_to_sheet(activityRows)
+    activitySheet['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 13 }, { wch: 16 }, { wch: 14 }]
+    XLSX.utils.book_append_sheet(wb, activitySheet, 'Activities')
+
+    const notesSheet = XLSX.utils.aoa_to_sheet(notesRows)
+    notesSheet['!cols'] = [{ wch: 20 }, { wch: 70 }]
+    XLSX.utils.book_append_sheet(wb, notesSheet, 'Notes')
 
     // XLSX.writeFile() isn't reliable in every browser/bundler setup — building the
     // file as a byte array and downloading it via a Blob works consistently everywhere.
