@@ -28,6 +28,9 @@ export default function DashboardPage() {
 
   const [pendingEditorIds, setPendingEditorIds] = useState<Set<string>>(new Set())
   const [pendingResponsible, setPendingResponsible] = useState<string>('')
+  const [pendingName, setPendingName] = useState<string>('')
+  const [pendingLocation, setPendingLocation] = useState<string>('')
+  const [pendingClient, setPendingClient] = useState<string>('')
   const [savingAccess, setSavingAccess] = useState(false)
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [activityLog, setActivityLog] = useState<any[]>([])
@@ -60,6 +63,10 @@ export default function DashboardPage() {
       setProjectEditorIds(ids)
       setPendingEditorIds(new Set(ids))
       setPendingResponsible(settingsRes?.responsible || '')
+      const currentProject = projects.find((p: any) => p.id === selectedProject)
+      setPendingName(currentProject?.name || '')
+      setPendingLocation(currentProject?.location || '')
+      setPendingClient(currentProject?.client || '')
     } catch {
       alert('Could not load the access list.')
     }
@@ -83,11 +90,14 @@ export default function DashboardPage() {
         ...toAdd.map(userId => fetch(`/api/projects/${selectedProject}/editors`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })),
         ...toRemove.map(userId => fetch(`/api/projects/${selectedProject}/editors`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) })),
         fetch(`/api/projects/${selectedProject}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ responsible: pendingResponsible || null }) }),
+        fetch(`/api/projects/${selectedProject}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: pendingName, location: pendingLocation, client: pendingClient }) }),
       ])
       setProjectEditorIds(new Set(pendingEditorIds))
-      // Optimistic update so the sidebar reflects the new Responsible immediately,
+      // Optimistic update so the sidebar/table reflect the changes immediately,
       // without waiting for a full page reload.
-      setProjects(prev => prev.map((p: any) => p.id === selectedProject ? { ...p, project_settings: [{ responsible: pendingResponsible || null }] } : p))
+      setProjects(prev => prev.map((p: any) => p.id === selectedProject
+        ? { ...p, name: pendingName, location: pendingLocation, client: pendingClient, project_settings: [{ responsible: pendingResponsible || null }] }
+        : p))
       setShowAccessPanel(false)
     } catch {
       alert('Error saving access changes.')
@@ -384,7 +394,7 @@ export default function DashboardPage() {
             <div onClick={() => setShowAccessPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: 24, width: '100%', maxWidth: 420, maxHeight: '80vh', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>Acces — {projects.find(p => p.id === selectedProject)?.name}</h3>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>Project Settings — {projects.find(p => p.id === selectedProject)?.name}</h3>
                   <button onClick={() => setShowAccessPanel(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
                 {loadingAccess ? (
@@ -393,6 +403,17 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <>
+                    <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #f3f4f6' }}>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MCORE_DARK, marginBottom: 6 }}>✏️ Project details</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <input value={pendingName} onChange={e => setPendingName(e.target.value)} placeholder="Project name"
+                          style={{ border: '1px solid #d1d5db', borderRadius: 7, padding: '7px 10px', fontSize: 13, color: MCORE_DARK }} />
+                        <input value={pendingLocation} onChange={e => setPendingLocation(e.target.value)} placeholder="Location"
+                          style={{ border: '1px solid #d1d5db', borderRadius: 7, padding: '7px 10px', fontSize: 13, color: MCORE_DARK }} />
+                        <input value={pendingClient} onChange={e => setPendingClient(e.target.value)} placeholder="Client"
+                          style={{ border: '1px solid #d1d5db', borderRadius: 7, padding: '7px 10px', fontSize: 13, color: MCORE_DARK }} />
+                      </div>
+                    </div>
                     <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #f3f4f6' }}>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: MCORE_DARK, marginBottom: 6 }}>⭐ Responsible for this project</label>
                       <select value={pendingResponsible} onChange={e => setPendingResponsible(e.target.value)}
