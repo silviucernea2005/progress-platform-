@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
 const MCORE_RED = '#A70202'
+const NAV_BG = '#22304A'
 const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
@@ -1191,7 +1192,7 @@ ${photosHtml}
     <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
 
       {/* STICKY HEADER */}
-      <header className="s7-header-row" style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+      <header className="s7-header-row" style={{ position: 'sticky', top: 0, zIndex: 100, background: NAV_BG, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{ background: MCORE_RED, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
@@ -1204,37 +1205,49 @@ ${photosHtml}
         </div>
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
-        <div className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="s7-btn" onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
-          <button className="s7-btn" onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
-          <button className="s7-btn" onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
-          {currentUser?.role === 'admin' && (
-            <button className="s7-btn" onClick={toggleWeightsEdit} style={btn(editingWeights ? ORANGE : 'rgba(255,255,255,0.1)')}>⚖️ Weights</button>
-          )}
-          <div style={{ position: 'relative' }}>
-            <button className="s7-btn" onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
-            {showExportMenu && (
-              <div onMouseLeave={() => setShowExportMenu(false)}
-                style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
-                <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportWordClientSide() }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📄 Word</button>
-                <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
-                <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportExcel() }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📊 Excel</button>
-              </div>
-            )}
+        <div className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="s7-nav-divider" style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', marginRight: 4 }} />
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '4px 6px' }}>
+            <button className="s7-btn" onClick={() => setShowDates(!showDates)} style={btn('rgba(255,255,255,0.1)')}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
+            <button className="s7-btn" onClick={() => setShowMiniCharts(!showMiniCharts)} style={btn('rgba(255,255,255,0.1)')}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
           </div>
-          <button className="s7-btn" onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(BLUE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
+
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '4px 6px' }}>
+            <button className="s7-btn" onClick={() => { if (requireLogin()) toggleFullEdit() }} style={{ ...btn(editing ? ORANGE : 'rgba(255,255,255,0.1)'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+            {currentUser?.role === 'admin' && (
+              <button className="s7-btn" onClick={toggleWeightsEdit} style={btn(editingWeights ? ORANGE : 'rgba(255,255,255,0.1)')}>⚖️ Weights</button>
+            )}
+            <div style={{ position: 'relative' }}>
+              <button className="s7-btn" onClick={() => setShowExportMenu(!showExportMenu)} style={btn(BLUE)}>📦 Export ▾</button>
+              {showExportMenu && (
+                <div onMouseLeave={() => setShowExportMenu(false)}
+                  style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', overflow: 'hidden', zIndex: 200, minWidth: 140 }}>
+                  <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportWordClientSide() }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📄 Word</button>
+                  <button onClick={() => { setShowExportMenu(false); exportPdfClientSide() }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📑 PDF</button>
+                  <button onClick={() => { setShowExportMenu(false); if (requireLogin()) exportExcel() }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📊 Excel</button>
+                </div>
+              )}
+            </div>
+            <button className="s7-btn" onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(BLUE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
+          </div>
+
+          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
           <button className="s7-btn" onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn('#dc2626'), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
-          <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
+
+          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
+          <button className="s7-btn" onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 12 }}>← Dashboard</button>
           {authChecked && (
             currentUser ? (
-              <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null); setEditing(false); setEditingWeights(false); setEditingPeriod(false) }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 11 }}>{currentUser.name} · Logout</button>
+              <button className="s7-btn" onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); setCurrentUser(null); setEditing(false); setEditingWeights(false); setEditingPeriod(false) }}
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: '#fff', cursor: 'pointer', fontSize: 12, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                👤 {currentUser.name} <span style={{ opacity: 0.6 }}>· Logout</span>
+              </button>
             ) : (
-              <button onClick={() => router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)}
-                style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 11, padding: '4px 10px' }}>Login</button>
+              <button className="s7-btn" onClick={() => router.push(`/login?returnTo=${encodeURIComponent(`/reports/${id}`)}`)}
+                style={{ background: BLUE, border: 'none', borderRadius: 20, color: '#fff', cursor: 'pointer', fontSize: 12, padding: '6px 14px', fontWeight: 600 }}>👤 Login</button>
             )
           )}
         </div>
