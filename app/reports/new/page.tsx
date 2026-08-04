@@ -290,7 +290,7 @@ function NewReportForm() {
   const lbl = { display: 'block' as any, fontSize: 13, fontWeight: 500 as any, marginBottom: 6, color: '#374151' }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f3', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
           <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
@@ -303,7 +303,7 @@ function NewReportForm() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} style={{ display: 'none' }} />
-          <button onClick={() => fileRef.current?.click()} disabled={uploading}
+          <button className="s7-btn" onClick={() => fileRef.current?.click()} disabled={uploading}
             style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 13px', fontSize: 12, cursor: 'pointer' }}>
             {uploading ? 'Processing...' : '📤 Upload Excel'}
           </button>
@@ -315,7 +315,7 @@ function NewReportForm() {
         <h1 style={{ fontSize: 20, fontWeight: 700, color: MCORE_DARK, marginBottom: 24 }}>New Report</h1>
 
         {/* General info */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: MCORE_DARK }}>General Information</h2>
           <div style={{ marginBottom: 14 }}>
             <label style={lbl}>Project *</label>
@@ -331,7 +331,7 @@ function NewReportForm() {
         </div>
 
         {/* Activities */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h2 style={{ fontSize: 14, fontWeight: 600, color: MCORE_DARK, margin: 0 }}>Activities Progress</h2>
@@ -359,7 +359,7 @@ function NewReportForm() {
         </div>
 
         {/* Photos */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 16 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: MCORE_DARK }}>Site Photos & Attachments</h2>
           {photos.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
@@ -390,7 +390,7 @@ function NewReportForm() {
         </div>
 
         {/* Works & Red Flags */}
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 24 }}>
           <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: MCORE_DARK }}>Works & Notes</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div>
@@ -412,8 +412,8 @@ function NewReportForm() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={handleSave} disabled={saving}
+          <button className="s7-btn" onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
+          <button className="s7-btn" onClick={handleSave} disabled={saving}
             style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             {saving ? 'Saving...' : 'Save report'}
           </button>
