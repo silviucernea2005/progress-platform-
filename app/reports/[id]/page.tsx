@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
+const MCORE_RED = '#A70202'
 const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
@@ -1061,7 +1062,7 @@ export default function ReportPage() {
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: Arial, sans-serif; color: #1A1A2A; background: #fff; }
   .header { background: #1A1A2A; color: white; padding: 24px 32px; display:flex; justify-content:space-between; align-items:center; }
-  .logo { font-size: 22px; font-weight: 900; background: #185FA5; padding: 6px 14px; border-radius: 8px; }
+  .logo { font-size: 18px; font-weight: 900; background: #A70202; width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
   .logo-sub { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-top: 2px; }
   .score-box { background: #2C2C3E; border-radius: 12px; padding: 20px 28px; margin: 24px; display:flex; justify-content:space-between; align-items:center; color:white; }
   .score-title { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
@@ -1084,10 +1085,11 @@ export default function ReportPage() {
 <div class="header">
   <div>
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo">S7</div>
+      <div class="logo">M</div>
       <div>
-        <div style="font-weight:700;font-size:14px">Square 7</div>
-        <div class="logo-sub">PART OF M.CORE</div>
+        <div style="font-weight:800;font-size:15px">M°Core</div>
+        <div style="width:36px;height:2px;background:#A70202;margin:3px 0"></div>
+        <div class="logo-sub">SQUARE 7</div>
       </div>
     </div>
   </div>
@@ -1191,10 +1193,11 @@ ${photosHtml}
       {/* STICKY HEADER */}
       <header className="s7-header-row" style={{ position: 'sticky', top: 0, zIndex: 100, background: MCORE_DARK, color: '#fff', padding: '10px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
         <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <div style={{ background: BLUE, borderRadius: 7, padding: '3px 9px', fontWeight: 900, fontSize: 15, letterSpacing: 1 }}>S7</div>
+          <div style={{ background: MCORE_RED, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>Square 7</div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', letterSpacing: 1 }}>PART OF M.CORE</div>
+            <span style={{ fontWeight: 800, fontSize: 13, color: '#fff', letterSpacing: 0.2 }}>M°Core</span>
+            <div style={{ width: 36, height: 2, background: MCORE_RED, margin: '2px 0 2px' }} />
+            <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.2 }}>SQUARE 7</div>
           </div>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
           <span style={{ fontWeight: 500, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Progress Platform</span>
