@@ -45,6 +45,17 @@ export default function NewProjectPage() {
     fetch('/api/projects').then(r => r.json()).then(d => setExistingProjects(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
+  // Escape discards and goes back, same as the New Report page.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (confirm('Discard and go back?')) router.back()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   function levenshtein(a: string, b: string): number {
     const m = a.length, n = b.length
     const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)])
