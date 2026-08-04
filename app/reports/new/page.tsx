@@ -84,6 +84,54 @@ function NewReportForm() {
     return images
   }
 
+  // Extract a handful of evenly-spaced frames from a video file, entirely client-side.
+  async function extractVideoFrames(file: File): Promise<string[]> {
+    return new Promise((resolve) => {
+      const video = document.createElement('video')
+      video.preload = 'auto'
+      video.muted = true
+      video.playsInline = true
+      const url = URL.createObjectURL(file)
+      video.src = url
+      const frames: string[] = []
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        URL.revokeObjectURL(url)
+        video.remove()
+        resolve(frames)
+      }
+      video.onerror = () => finish()
+      video.onloadedmetadata = async () => {
+        const duration = video.duration
+        if (!duration || !isFinite(duration)) { finish(); return }
+        const numFrames = Math.min(12, Math.max(4, Math.floor(duration / 4)))
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth || 1280
+        canvas.height = video.videoHeight || 720
+        const ctx = canvas.getContext('2d')
+        for (let i = 0; i < numFrames; i++) {
+          const t = duration * (0.03 + (i / Math.max(numFrames - 1, 1)) * 0.94)
+          await new Promise<void>(res => {
+            const onSeeked = () => {
+              video.removeEventListener('seeked', onSeeked)
+              try {
+                ctx?.drawImage(video, 0, 0, canvas.width, canvas.height)
+                frames.push(canvas.toDataURL('image/jpeg', 0.82))
+              } catch {}
+              res()
+            }
+            video.addEventListener('seeked', onSeeked)
+            video.currentTime = t
+          })
+        }
+        finish()
+      }
+      setTimeout(finish, 20000)
+    })
+  }
+
   async function handlePhotoDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragOver(false)
@@ -129,6 +177,11 @@ function NewReportForm() {
           try {
             const images = await extractOfficeImages(file)
             for (const img of images) newPhotos.push(await compressImage(img))
+          } catch {}
+        } else if (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov|webm|m4v)$/i)) {
+          try {
+            const frames = await extractVideoFrames(file)
+            for (const f of frames) newPhotos.push(await compressImage(f))
           } catch {}
         }
       }
@@ -329,7 +382,7 @@ function NewReportForm() {
             ) : (
               <>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
-                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel, Word or video here</div>
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
               </>
             )}
