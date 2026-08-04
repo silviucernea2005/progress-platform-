@@ -154,7 +154,15 @@ export default function DashboardPage() {
     loadDashboard()
   }, [])
 
-  const filteredReports = selectedProject === 'all' ? reports : reports.filter(r => r.project_id === selectedProject)
+  const filteredReports = reports.filter((r: any) => {
+    if (selectedProject !== 'all' && r.project_id !== selectedProject) return false
+    if (filterResponsible !== 'all' || filterClient !== 'all') {
+      const proj = projects.find((p: any) => p.id === r.project_id)
+      if (filterResponsible !== 'all' && getProjectResponsible(proj) !== filterResponsible) return false
+      if (filterClient !== 'all' && proj?.client !== filterClient) return false
+    }
+    return true
+  })
 
   function getProgress(projectId: string) {
     const rep = reports.find((r: any) => r.project_id === projectId)
@@ -342,6 +350,11 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: MCORE_DARK, margin: 0 }}>
               {selectedProject === 'all' ? 'All Reports' : `Reports — ${projects.find(p => p.id === selectedProject)?.name || ''}`}
+              {(filterResponsible !== 'all' || filterClient !== 'all') && (
+                <span style={{ fontSize: 13, fontWeight: 400, color: '#9ca3af' }}>
+                  {' '}({[filterResponsible !== 'all' ? filterResponsible : null, filterClient !== 'all' ? filterClient : null].filter(Boolean).join(' · ')})
+                </span>
+              )}
             </h2>
             <div style={{ display: 'flex', gap: 8 }}>
               {currentUser?.role === 'admin' && selectedProject !== 'all' && (
