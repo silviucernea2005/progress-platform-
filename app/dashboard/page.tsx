@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 const MCORE_DARK = '#1A1A2A'
+const MCORE_RED = '#A70202'
 const BLUE = '#185FA5'
 const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
@@ -171,10 +172,11 @@ export default function DashboardPage() {
       {/* HEADER */}
       <header className="s7-header-row" style={{ position: 'relative', background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div onClick={loadDashboard} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-          <div style={{ background: BLUE, borderRadius: 8, padding: '4px 10px', fontWeight: 900, fontSize: 16, letterSpacing: 1 }}>S7</div>
+          <div style={{ background: MCORE_RED, borderRadius: 6, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 17, color: '#fff', flexShrink: 0 }}>M</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>Square 7</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', letterSpacing: 1 }}>PART OF M.CORE</div>
+            <span style={{ fontWeight: 800, fontSize: 15, color: '#fff', letterSpacing: 0.2 }}>M°Core</span>
+            <div style={{ width: 42, height: 2, background: MCORE_RED, margin: '3px 0 3px' }} />
+            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.4 }}>SQUARE 7</div>
           </div>
           <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
           <span style={{ fontWeight: 500, fontSize: 13, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
