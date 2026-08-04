@@ -154,6 +154,24 @@ export default function DashboardPage() {
     loadDashboard()
   }, [])
 
+  // Selecting a specific project and filtering by Responsible/Client are mutually
+  // exclusive views — combining them (e.g. project = Adjud RP + responsible = Ovidiu,
+  // who isn't on Adjud RP) silently produces zero results, which looks like a bug.
+  // These helpers keep only one active at a time.
+  function selectProject(id: string) {
+    setSelectedProject(id)
+    setFilterResponsible('all')
+    setFilterClient('all')
+  }
+  function setResponsibleFilter(value: string) {
+    setFilterResponsible(value)
+    setSelectedProject('all')
+  }
+  function setClientFilter(value: string) {
+    setFilterClient(value)
+    setSelectedProject('all')
+  }
+
   const filteredReports = reports.filter((r: any) => {
     if (selectedProject !== 'all' && r.project_id !== selectedProject) return false
     if (filterResponsible !== 'all' || filterClient !== 'all') {
@@ -250,7 +268,7 @@ export default function DashboardPage() {
 
           {/* Dropdown for mobile / quick select */}
           <div style={{ padding: '0 12px 12px' }}>
-            <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
+            <select value={selectedProject} onChange={e => selectProject(e.target.value)}
               style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: MCORE_DARK, background: '#f9fafb' }}>
               <option value="all">All Projects</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -258,7 +276,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="s7-dash-projectlist">
-          <div onClick={() => setSelectedProject('all')}
+          <div onClick={() => selectProject('all')}
             style={{ padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: selectedProject === 'all' ? 600 : 400, color: selectedProject === 'all' ? MCORE_DARK : '#374151', background: selectedProject === 'all' ? '#f5f5f3' : 'transparent', borderLeft: selectedProject === 'all' ? `3px solid ${MCORE_DARK}` : '3px solid transparent' }}>
             All Projects
           </div>
@@ -275,7 +293,7 @@ export default function DashboardPage() {
               const isSelected = selectedProject === p.id
               const canDelete = currentUser && (currentUser.role === 'admin' || p.created_by === currentUser.id)
               return (
-                <div key={p.id} onClick={() => setSelectedProject(p.id)}
+                <div key={p.id} onClick={() => selectProject(p.id)}
                   style={{ padding: '10px 16px', cursor: 'pointer', borderLeft: isSelected ? `3px solid ${ORANGE}` : '3px solid transparent', background: isSelected ? '#fef9f5' : 'transparent', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                     <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 400, color: isSelected ? ORANGE : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
@@ -335,14 +353,14 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               {projects.length > 0 && (
                 <>
-                  <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
+                  <select value={filterResponsible} onChange={e => setResponsibleFilter(e.target.value)}
                     style={{ border: '1px solid #e5e7eb', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: '#6b7280', background: '#fff' }}>
                     <option value="all">👤 All responsibles</option>
                     {Array.from(new Set(projects.map((p: any) => getProjectResponsible(p)).filter(Boolean))).sort().map((name: any) => (
                       <option key={name} value={name}>{name}</option>
                     ))}
                   </select>
-                  <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                  <select value={filterClient} onChange={e => setClientFilter(e.target.value)}
                     style={{ border: '1px solid #e5e7eb', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: '#6b7280', background: '#fff' }}>
                     <option value="all">🏢 All clients</option>
                     {Array.from(new Set(projects.map((p: any) => p.client).filter(Boolean))).sort().map((client: any) => (
