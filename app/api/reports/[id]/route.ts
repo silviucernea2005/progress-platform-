@@ -56,6 +56,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.works_done !== undefined) update.works_done = body.works_done
     if (body.works_planned !== undefined) update.works_planned = body.works_planned
     if (body.red_flags !== undefined) update.red_flags = body.red_flags
+    if (body.responsible !== undefined) update.responsible = body.responsible
     if (body.period_start !== undefined) update.period_start = body.period_start
     if (body.period_end !== undefined) update.period_end = body.period_end
     if (Object.keys(update).length > 1) {
@@ -94,5 +95,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
