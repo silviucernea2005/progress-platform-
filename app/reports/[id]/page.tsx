@@ -483,7 +483,61 @@ export default function ReportPage() {
     })
   }
 
-  // Photo drag & drop — supports images, PDF, Excel, Word (extract embedded images/pages automatically)
+  // Extract a handful of evenly-spaced frames from a video file, entirely client-side
+  // (HTML5 <video> + <canvas>, no server/ffmpeg needed) — same idea as extracting pages
+  // from a PDF or images from an xlsx/docx.
+  async function extractVideoFrames(file: File): Promise<string[]> {
+    return new Promise((resolve) => {
+      const video = document.createElement('video')
+      video.preload = 'auto'
+      video.muted = true
+      video.playsInline = true
+      const url = URL.createObjectURL(file)
+      video.src = url
+      const frames: string[] = []
+      let settled = false
+      const finish = () => {
+        if (settled) return
+        settled = true
+        URL.revokeObjectURL(url)
+        video.remove()
+        resolve(frames)
+      }
+      video.onerror = () => finish()
+      video.onloadedmetadata = async () => {
+        const duration = video.duration
+        if (!duration || !isFinite(duration)) { finish(); return }
+        // ~1 frame every 4s of footage, at least 4 and at most 12 — enough to cover a
+        // typical site walkthrough without flooding the gallery.
+        const numFrames = Math.min(12, Math.max(4, Math.floor(duration / 4)))
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth || 1280
+        canvas.height = video.videoHeight || 720
+        const ctx = canvas.getContext('2d')
+        for (let i = 0; i < numFrames; i++) {
+          // Skip the very first/last ~3% to avoid black/loading frames at the edges.
+          const t = duration * (0.03 + (i / Math.max(numFrames - 1, 1)) * 0.94)
+          await new Promise<void>(res => {
+            const onSeeked = () => {
+              video.removeEventListener('seeked', onSeeked)
+              try {
+                ctx?.drawImage(video, 0, 0, canvas.width, canvas.height)
+                frames.push(canvas.toDataURL('image/jpeg', 0.82))
+              } catch {}
+              res()
+            }
+            video.addEventListener('seeked', onSeeked)
+            video.currentTime = t
+          })
+        }
+        finish()
+      }
+      // Safety net in case the browser can't decode this codec and never fires events
+      setTimeout(finish, 20000)
+    })
+  }
+
+  // Photo drag & drop — supports images, PDF, Excel, Word, and now video (extract embedded images/pages/frames automatically)
   useEffect(() => {
     if (lightboxIndex === null) return
     const imagePhotos = photos.filter(p => p.url && !p.url.startsWith('data:text/plain'))
@@ -554,6 +608,19 @@ export default function ReportPage() {
             const ext = file.name.split('.').pop()?.toLowerCase()
             const icon = ext === 'xlsx' ? '📊' : '📄'
             newPhotos.push(`data:text/plain,${icon} ${file.name}`)
+          }
+        }
+        // Video (mp4/mov/webm/m4v): extract a handful of evenly-spaced frames automatically
+        else if (file.type.startsWith('video/') || file.name.match(/\.(mp4|mov|webm|m4v)$/i)) {
+          try {
+            const frames = await extractVideoFrames(file)
+            if (frames.length) {
+              for (const f of frames) newPhotos.push(await compressImage(f))
+            } else {
+              newPhotos.push(`data:text/plain,🎥 ${file.name} (couldn't extract frames — try re-exporting as .mp4)`)
+            }
+          } catch {
+            newPhotos.push(`data:text/plain,🎥 ${file.name}`)
           }
         }
         // Old binary .xls / .doc — not a ZIP, images can't be extracted this way
@@ -1535,8 +1602,8 @@ ${photosHtml}
               ) : (
                 <>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel or Word here</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages & Excel/Word images extracted automatically</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel, Word or video here</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages, Excel/Word images & video frames extracted automatically</div>
                 </>
               )}
             </div>
