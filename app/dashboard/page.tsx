@@ -129,6 +129,7 @@ export default function DashboardPage() {
 
   function requireEditRights(projectId: string): boolean {
     if (!requireLogin()) return false
+    if (currentUser?.role === 'admin') return true
     if (!canEditMap[projectId]) {
       alert("You don't have edit rights on this project. Only the project's creator, an assigned editor, or an admin can edit.")
       return false
@@ -163,6 +164,15 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboard()
   }, [])
+
+  // Admins always have edit rights (handled directly in requireEditRights), so this
+  // is only needed to check per-project rights for non-admin colleagues.
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'admin' || !projects.length) return
+    Promise.all(projects.map((p: any) =>
+      fetch(`/api/projects/${p.id}/can-edit`).then(r => r.json()).then(d => [p.id, !!d.allowed]).catch(() => [p.id, false])
+    )).then(pairs => setCanEditMap(Object.fromEntries(pairs)))
+  }, [currentUser, projects.length])
 
   // Selecting a specific project and filtering by Responsible/Client are mutually
   // exclusive views — combining them (e.g. project = Adjud RP + responsible = Ovidiu,
