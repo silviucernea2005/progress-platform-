@@ -1021,73 +1021,33 @@ export default function ReportPage() {
   }
 
   async function exportExcel() {
-    const XLSX = await import('xlsx')
+    const mainChartImage = mainChartRef.current ? mainChartRef.current.toDataURL('image/png', 1.0) : null
+    const miniChartImages = showMiniCharts ? [tenderChartRef, contractingChartRef, constructionChartRef]
+      .map(r => r.current ? r.current.toDataURL('image/png', 1.0) : null)
+      .filter(Boolean) : []
 
-    const num = (v: any, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback }
-    const splitLines = (text: string) => (text || '').split('\n').map(s => s.trim()).filter(Boolean)
-
-    const summaryRows = [
-      ['Project', report.project?.name || ''],
-      ['Period', `${report.period_start || ''} – ${report.period_end || ''}`],
-      ['Weighted Progress', `${num(totalProgress).toFixed(2)}%`],
-      ['Weekly Progress', `${num(weeklyProgress)}%`],
-      ...(contractFinish ? [['Contract Finish', contractFinish], ['Days Remaining', String(daysBetween(today, contractFinish))]] : []),
-      ...(estimatedAtContractFinish !== null ? [['Estimated at Contract Finish', `${num(estimatedAtContractFinish).toFixed(1)}%`]] : []),
-      ...(trendFinishDate ? [['Trend Finish Date', trendFinishDate]] : []),
-      ...(responsible || projectResponsible ? [['Responsible', responsible || projectResponsible]] : []),
-    ]
-
-    const activityRows = [
-      ['Activity', 'Weight (%)', 'Progress (%)', 'Contribution (%)', 'Status'],
-      ...acts.map((a: any) => {
-        const w = num(getWeight(a.activity_id, a.activity?.default_weight || 0))
-        const progress = num(a.progress)
-        const contribution = num((progress * w / 100).toFixed(2))
-        const status = progress === 0 ? 'Not started' : progress < 100 ? 'In progress' : 'Completed'
-        return [a.activity?.name || '(unnamed)', w, progress, contribution, status]
-      }),
-      ['TOTAL', 100, '', num(totalProgress).toFixed(2), '']
-    ]
-
-    // One line per row instead of one multi-line cell — the free xlsx library doesn't
-    // reliably write the "wrap text" style, so a squished-together cell was the result.
-    const notesRows: any[][] = []
-    const addSection = (title: string, text: string) => {
-      notesRows.push([title])
-      const lines = splitLines(text)
-      if (lines.length) lines.forEach(line => notesRows.push(['', line]))
-      else notesRows.push(['', '—'])
-      notesRows.push([''])
+    try {
+      const res = await fetch(`/api/reports/${id}/export-excel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mainChartImage, miniChartImages })
+      })
+      if (!res.ok) {
+        alert('Could not generate the Excel file.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Raport_${report.project?.name}_${report.period_start}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Network error generating the Excel file.')
     }
-    addSection('Works Completed', worksDone)
-    addSection('Works Planned', worksPlanned)
-    addSection('Red Flags', redFlags)
-
-    const wb = XLSX.utils.book_new()
-    const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows)
-    summarySheet['!cols'] = [{ wch: 24 }, { wch: 34 }]
-    XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary')
-
-    const activitySheet = XLSX.utils.aoa_to_sheet(activityRows)
-    activitySheet['!cols'] = [{ wch: 22 }, { wch: 12 }, { wch: 13 }, { wch: 16 }, { wch: 14 }]
-    XLSX.utils.book_append_sheet(wb, activitySheet, 'Activities')
-
-    const notesSheet = XLSX.utils.aoa_to_sheet(notesRows)
-    notesSheet['!cols'] = [{ wch: 20 }, { wch: 70 }]
-    XLSX.utils.book_append_sheet(wb, notesSheet, 'Notes')
-
-    // XLSX.writeFile() isn't reliable in every browser/bundler setup — building the
-    // file as a byte array and downloading it via a Blob works consistently everywhere.
-    const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-    const blob = new Blob([wbArray], { type: 'application/octet-stream' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Raport_${(report.project?.name || 'report').replace(/[^a-z0-9]+/gi, '_')}_${report.period_start || ''}.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
   }
 
   // Client-side PDF export — opens in a NEW tab so the current report/dashboard is never lost,
