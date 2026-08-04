@@ -28,6 +28,7 @@ export default function ReportPage() {
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
   const [responsible, setResponsible] = useState('')
+  const [projectResponsible, setProjectResponsible] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDates, setShowDates] = useState(false)
@@ -87,6 +88,7 @@ export default function ReportPage() {
   const [contractFinish, setContractFinish] = useState('')
 
   const mainChartRef = useRef<HTMLCanvasElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
   const tenderChartRef = useRef<HTMLCanvasElement>(null)
   const contractingChartRef = useRef<HTMLCanvasElement>(null)
   const constructionChartRef = useRef<HTMLCanvasElement>(null)
@@ -173,6 +175,7 @@ export default function ReportPage() {
           setConstructionStart(d.constructionStart || ''); setConstructionFinishEstimated(d.constructionFinishEstimated || '')
           setContractStart(d.contractStart || ''); setContractFinish(d.contractFinish || '')
           setWeights(w)
+          setProjectResponsible(settingsRes?.responsible || '')
         } catch (e) {
           console.error('Error loading project settings:', e)
           setSettingsLoadError('Unexpected error loading project data from the server.')
@@ -571,10 +574,7 @@ export default function ReportPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxIndex, photos])
 
-  async function handlePhotoDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    const files = Array.from(e.dataTransfer.files)
+  async function processAndUploadFiles(files: File[]) {
     if (!files.length) return
     setUploadingPhoto(true)
     const newPhotos: string[] = []
@@ -679,6 +679,21 @@ export default function ReportPage() {
     setUploadingPhoto(false)
     setPhotosJustSaved(false)
   }
+
+  async function handlePhotoDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    await processAndUploadFiles(Array.from(e.dataTransfer.files))
+  }
+
+  // Drag & drop doesn't work with touch on mobile — this lets tapping the dropzone
+  // open the native file picker (camera roll / files app) instead.
+  async function handlePhotoInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    await processAndUploadFiles(files)
+  }
+
 
   // Photos are saved to the server as soon as they're uploaded — this just re-confirms/re-syncs
   function savePhotosNow() {
@@ -1405,7 +1420,7 @@ ${photosHtml}
             <div>
               <h1 style={{ fontSize: 30, fontWeight: 800, margin: 0, letterSpacing: -0.5 }}>{report.project?.name}</h1>
               <p style={{ color: 'rgba(255,255,255,0.65)', marginTop: 4, fontSize: 13 }}>{report.period_start} – {report.period_end}</p>
-              {responsible && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>👤 Responsible: {responsible}</p>}
+              {(responsible || projectResponsible) && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>👤 Responsible: {responsible || projectResponsible}</p>}
               {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
               </p>}
@@ -1481,7 +1496,7 @@ ${photosHtml}
                 </button>
               </div>
             </div>
-            <div style={{ height: chartFullscreen ? 'calc(100vh - 100px)' : 260 }}>
+            <div style={{ height: chartFullscreen ? 'calc(100vh - 100px)' : 420 }}>
               <canvas ref={mainChartRef} />
             </div>
           </div>
@@ -1551,10 +1566,14 @@ ${photosHtml}
         <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: '#9ca3af' }}>👤 Responsible:</span>
           {editing ? (
-            <input value={responsible} onChange={e => setResponsible(e.target.value)} placeholder="e.g. Horia Ghitescu"
-              style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 12, outline: 'none' }} />
+            <>
+              <input value={responsible} onChange={e => setResponsible(e.target.value)}
+                placeholder={projectResponsible ? `Default: ${projectResponsible}` : 'e.g. Horia Ghitescu'}
+                style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', fontSize: 12, outline: 'none' }} />
+              <span style={{ fontSize: 10.5, color: '#9ca3af' }}>Leave empty to use the project default (set in Manage Access on the dashboard)</span>
+            </>
           ) : (
-            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>{responsible || '—'}</span>
+            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>{responsible || projectResponsible || '—'}</span>
           )}
         </div>
 
@@ -1669,16 +1688,18 @@ ${photosHtml}
 
           {editing && (
             <div
+              onClick={() => photoInputRef.current?.click()}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handlePhotoDrop}
               style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, borderRadius: 10, padding: 24, textAlign: 'center', background: dragOver ? '#eff6ff' : '#f9fafb', transition: 'all 0.2s', cursor: 'pointer' }}>
+              <input ref={photoInputRef} type="file" multiple accept="image/*,.pdf,.xlsx,.docx,.xls,.doc,video/*,.mp4,.mov,.webm,.m4v" onChange={handlePhotoInputChange} style={{ display: 'none' }} />
               {uploadingPhoto ? (
                 <div style={{ color: BLUE, fontSize: 13 }}>Processing files...</div>
               ) : (
                 <>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>📸</div>
-                  <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop photos, PDF, Excel, Word or video here</div>
+                  <div style={{ fontSize: 13, color: '#6b7280' }}>Drag & drop, or tap to browse — photos, PDF, Excel, Word or video</div>
                   <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Photos added directly · PDF pages, Excel/Word images & video frames extracted automatically</div>
                 </>
               )}
