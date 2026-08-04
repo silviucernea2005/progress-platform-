@@ -167,7 +167,7 @@ export default function DashboardPage() {
   const btn = (bg: string, color = '#fff') => ({ background: bg, color, border: 'none', borderRadius: 7, padding: '7px 15px', fontSize: 13, cursor: 'pointer', fontWeight: 500, textDecoration: 'none', display: 'inline-block' } as any)
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f3', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6', display: 'flex', flexDirection: 'column' }}>
       {/* HEADER */}
       <header className="s7-header-row" style={{ position: 'relative', background: MCORE_DARK, color: '#fff', padding: '12px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div onClick={loadDashboard} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
@@ -182,8 +182,8 @@ export default function DashboardPage() {
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
         <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
-          <Link href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+          <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
+          <Link className="s7-btn" href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
           {currentUser?.role === 'admin' && (
             <button onClick={openActivityLog} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>📋 Activity Log</button>
           )}
@@ -202,6 +202,13 @@ export default function DashboardPage() {
         <aside className="s7-dash-sidebar" style={{ width: 230, background: '#fff', borderRight: '1px solid #e5e7eb', flexShrink: 0, overflowY: 'auto' }}>
           <div style={{ padding: '16px 16px 8px', fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 1.2 }}>PROJECTS</div>
 
+          <div style={{ padding: '0 12px 12px' }}>
+            <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }}
+              style={{ ...btn(GREEN), display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', fontWeight: 600, fontSize: 12, padding: '8px 0', boxSizing: 'border-box' }}>
+              + New Project
+            </Link>
+          </div>
+
           {/* Dropdown for mobile / quick select */}
           <div style={{ padding: '0 12px 12px' }}>
             <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)}
@@ -217,7 +224,11 @@ export default function DashboardPage() {
             All Projects
           </div>
 
-          {loading ? <div style={{ padding: '10px 16px', fontSize: 12, color: '#9ca3af' }}>Loading...</div>
+          {loading ? (
+            <div style={{ padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[1, 2, 3].map(i => <div key={i} className="s7-skeleton" style={{ height: 34, borderRadius: 6 }} />)}
+            </div>
+          )
             : projects.map(p => {
               const prog = getProgress(p.id)
               const isSelected = selectedProject === p.id
@@ -241,7 +252,7 @@ export default function DashboardPage() {
                   {prog !== null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
                       <div style={{ flex: 1, height: 3, background: '#f3f4f6', borderRadius: 99 }}>
-                        <div style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
+                        <div className="s7-progress-fill" style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
                       </div>
                       <span style={{ fontSize: 10, color: '#9ca3af' }}>{prog.toFixed(0)}%</span>
                     </div>
@@ -262,7 +273,7 @@ export default function DashboardPage() {
               { label: 'Total Reports', value: loading ? '—' : filteredReports.length, color: '#374151' },
               { label: 'Completed Projects', value: loading ? '—' : projects.filter(p => p.status === 'completed').length, color: '#3B6D11' },
             ].map(k => (
-              <div key={k.label} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '16px 20px' }}>
+              <div key={k.label} className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '16px 20px' }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: k.color }}>{k.value}</div>
                 <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>{k.label}</div>
               </div>
@@ -276,9 +287,9 @@ export default function DashboardPage() {
             </h2>
             <div style={{ display: 'flex', gap: 8 }}>
               {currentUser?.role === 'admin' && selectedProject !== 'all' && (
-                <button onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
+                <button className="s7-btn" onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
               )}
-              <Link href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (selectedProject !== 'all' ? !requireEditRights(selectedProject) : !requireLogin()) e.preventDefault() }} style={{ ...btn(ORANGE), fontWeight: 600 }}>+ New Report</Link>
+              <Link className="s7-btn" href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (selectedProject !== 'all' ? !requireEditRights(selectedProject) : !requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
             </div>
           </div>
 
@@ -289,7 +300,11 @@ export default function DashboardPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>Acces — {projects.find(p => p.id === selectedProject)?.name}</h3>
                   <button onClick={() => setShowAccessPanel(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
-                {loadingAccess ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Loading...</div> : (
+                {loadingAccess ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[1, 2, 3].map(i => <div key={i} className="s7-skeleton" style={{ height: 20 }} />)}
+                  </div>
+                ) : (
                   <>
                     <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Check the users who can edit this project. The project's creator and admins have automatic access.</p>
                     {allUsers.map(u => {
@@ -306,7 +321,7 @@ export default function DashboardPage() {
                     })}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
                       <button onClick={() => setShowAccessPanel(false)} style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
-                      <button onClick={saveAccessChanges} disabled={savingAccess} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>{savingAccess ? 'Saving...' : 'OK'}</button>
+                      <button className="s7-btn" onClick={saveAccessChanges} disabled={savingAccess} style={{ ...btn(BLUE), padding: '8px 20px', fontSize: 13 }}>{savingAccess ? 'Saving...' : 'OK'}</button>
                     </div>
                   </>
                 )}
@@ -321,7 +336,11 @@ export default function DashboardPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>📋 Activity Log</h3>
                   <button onClick={() => setShowActivityLog(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
-                {loadingLog ? <div style={{ fontSize: 13, color: '#9ca3af' }}>Loading...</div> : activityLog.length === 0 ? (
+                {loadingLog ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {[1, 2, 3, 4].map(i => <div key={i} className="s7-skeleton" style={{ height: 32 }} />)}
+                  </div>
+                ) : activityLog.length === 0 ? (
                   <div style={{ fontSize: 13, color: '#9ca3af' }}>No events logged yet.</div>
                 ) : (
                   activityLog.map((entry: any) => (
@@ -337,7 +356,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="s7-table-wrap s7-desktop-table" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+          <div className="s7-table-wrap s7-desktop-table s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
@@ -348,7 +367,9 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Loading...</td></tr>
+                {loading ? [1, 2, 3, 4].map(i => (
+                  <tr key={i}><td colSpan={4} style={{ padding: '10px 14px' }}><div className="s7-skeleton" style={{ height: 20 }} /></td></tr>
+                ))
                   : filteredReports.length === 0 ? <tr><td colSpan={4} style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>No reports yet. <Link href="/reports/new" style={{ color: ORANGE }}>Create first report</Link></td></tr>
                     : filteredReports.slice(0, 30).map((r: any) => {
                       const prog = getReportProgress(r)
@@ -359,7 +380,7 @@ export default function DashboardPage() {
                           <td style={{ padding: '11px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div style={{ height: 5, width: 80, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
-                                <div style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
+                                <div className="s7-progress-fill" style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
                               </div>
                               <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
                             </div>
@@ -373,8 +394,8 @@ export default function DashboardPage() {
                                   ? <img src={thumb} title="Has photos" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', border: '1px solid #e5e7eb' }} />
                                   : <span title="Has attachments" style={{ fontSize: 14 }}>📎</span>
                               })()}
-                              <Link href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
-                              <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
+                              <Link className="s7-btn" href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
+                              <Link className="s7-btn" href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
                             </div>
                           </td>
                         </tr>
@@ -386,13 +407,17 @@ export default function DashboardPage() {
 
           {/* MOBILE CARD LIST — no horizontal scroll, tap anywhere on the card to open the report */}
           <div className="s7-mobile-cards">
-            {loading ? <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', background: '#fff', borderRadius: 12 }}>Loading...</div>
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[1, 2, 3].map(i => <div key={i} className="s7-skeleton" style={{ height: 64, borderRadius: 12 }} />)}
+              </div>
+            )
               : filteredReports.length === 0 ? <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', background: '#fff', borderRadius: 12 }}>No reports yet. <Link href="/reports/new" style={{ color: ORANGE }}>Create first report</Link></div>
                 : filteredReports.slice(0, 30).map((r: any) => {
                   const prog = getReportProgress(r)
                   const { hasAny, thumb } = getPhotoInfo(r)
                   return (
-                    <div key={r.id} onClick={() => router.push(`/reports/${r.id}`)}
+                    <div key={r.id} className="s7-card" onClick={() => router.push(`/reports/${r.id}`)}
                       style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 14, marginBottom: 10, cursor: 'pointer' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -405,12 +430,12 @@ export default function DashboardPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
                         <div style={{ flex: 1, height: 6, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
+                          <div className="s7-progress-fill" style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
                         </div>
                         <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
-                        <Link href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
+                        <Link className="s7-btn" href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
                       </div>
                     </div>
                   )
