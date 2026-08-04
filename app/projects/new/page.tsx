@@ -160,7 +160,7 @@ export default function NewProjectPage() {
   const inputStyle = { width: '100%', border: '1px solid #d1d5db', borderRadius: 8, padding: '9px 12px', fontSize: 14, boxSizing: 'border-box' as any }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb' }}>
+    <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
       <header style={{ background: '#0C447C', color: '#fff', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontWeight: 600 }}>Progress Platform</span>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 14 }}>← Inapoi</button>
@@ -175,7 +175,7 @@ export default function NewProjectPage() {
           <span style={{ fontWeight: step === 'weights' ? 700 : 400, color: step === 'weights' ? BLUE : '#9ca3af' }}>3. Activity Weights</span>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20, opacity: step !== 'info' ? 0.6 : 1 }}>
+        <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20, opacity: step !== 'info' ? 0.6 : 1 }}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>Project Name *</label>
             <input value={name} onChange={e => { setName(e.target.value); setSimilarWarning(null) }} disabled={step !== 'info'} style={inputStyle} placeholder="e.g. Bocsa Retail Park" />
@@ -203,8 +203,8 @@ export default function NewProjectPage() {
 
           {step === 'info' && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-              <button onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => handleCreateProject()} disabled={saving} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <button className="s7-btn" onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
+              <button className="s7-btn" onClick={() => handleCreateProject()} disabled={saving} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Continue →'}
               </button>
             </div>
@@ -212,7 +212,7 @@ export default function NewProjectPage() {
         </div>
 
         {step === 'dates' && (
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20 }}>
+          <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24, marginBottom: 20 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: '0 0 4px' }}>Project Dates</h2>
             <p style={{ fontSize: 12, color: '#9ca3af', margin: '0 0 16px' }}>These drive the "Contract Plan" line and delay tracking on the report page. You can still adjust them later from the report if needed.</p>
             <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
@@ -234,8 +234,8 @@ export default function NewProjectPage() {
               ))}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button onClick={() => handleSaveDates(true)} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Skip for now</button>
-              <button onClick={() => handleSaveDates(false)} disabled={savingDates} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <button className="s7-btn" onClick={() => handleSaveDates(true)} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Skip for now</button>
+              <button className="s7-btn" onClick={() => handleSaveDates(false)} disabled={savingDates} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
                 {savingDates ? 'Saving...' : 'Continue →'}
               </button>
             </div>
@@ -243,7 +243,7 @@ export default function NewProjectPage() {
         )}
 
         {step === 'weights' && (
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
+          <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h2 style={{ fontSize: 16, fontWeight: 600, color: '#111827', margin: 0 }}>Activity Weights</h2>
               <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: totalWeight === 100 ? '#ecfdf5' : '#fef2f2', color: totalWeight === 100 ? '#065f46' : '#dc2626' }}>
@@ -277,8 +277,8 @@ export default function NewProjectPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button onClick={() => router.push('/dashboard')} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Skip</button>
-              <button onClick={handleFinish} disabled={savingWeights} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <button className="s7-btn" onClick={() => router.push('/dashboard')} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Skip</button>
+              <button className="s7-btn" onClick={handleFinish} disabled={savingWeights} style={{ padding: '10px 28px', background: BLUE, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
                 {savingWeights ? 'Saving...' : 'Save weights & Finish'}
               </button>
             </div>
