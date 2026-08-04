@@ -17,6 +17,8 @@ export default function DashboardPage() {
   const [reports, setReports] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProject, setSelectedProject] = useState<string>('all')
+  const [filterResponsible, setFilterResponsible] = useState<string>('all')
+  const [filterClient, setFilterClient] = useState<string>('all')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showAccessPanel, setShowAccessPanel] = useState(false)
@@ -247,6 +249,30 @@ export default function DashboardPage() {
             </select>
           </div>
 
+          {/* Filter the project list below by Responsible and/or Client */}
+          {projects.length > 0 && (
+            <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <select value={filterResponsible} onChange={e => setFilterResponsible(e.target.value)}
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 7, padding: '6px 8px', fontSize: 11, color: '#6b7280', background: '#fff' }}>
+                <option value="all">👤 All responsibles</option>
+                {Array.from(new Set(projects.map((p: any) => getProjectResponsible(p)).filter(Boolean))).sort().map((name: any) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 7, padding: '6px 8px', fontSize: 11, color: '#6b7280', background: '#fff' }}>
+                <option value="all">🏢 All clients</option>
+                {Array.from(new Set(projects.map((p: any) => p.client).filter(Boolean))).sort().map((client: any) => (
+                  <option key={client} value={client}>{client}</option>
+                ))}
+              </select>
+              {(filterResponsible !== 'all' || filterClient !== 'all') && (
+                <button onClick={() => { setFilterResponsible('all'); setFilterClient('all') }}
+                  style={{ fontSize: 10.5, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>✕ Clear filters</button>
+              )}
+            </div>
+          )}
+
           <div className="s7-dash-projectlist">
           <div onClick={() => setSelectedProject('all')}
             style={{ padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: selectedProject === 'all' ? 600 : 400, color: selectedProject === 'all' ? MCORE_DARK : '#374151', background: selectedProject === 'all' ? '#f5f5f3' : 'transparent', borderLeft: selectedProject === 'all' ? `3px solid ${MCORE_DARK}` : '3px solid transparent' }}>
@@ -258,7 +284,9 @@ export default function DashboardPage() {
               {[1, 2, 3].map(i => <div key={i} className="s7-skeleton" style={{ height: 34, borderRadius: 6 }} />)}
             </div>
           )
-            : projects.map(p => {
+            : projects
+              .filter((p: any) => (filterResponsible === 'all' || getProjectResponsible(p) === filterResponsible) && (filterClient === 'all' || p.client === filterClient))
+              .map(p => {
               const prog = getProgress(p.id)
               const isSelected = selectedProject === p.id
               const canDelete = currentUser && (currentUser.role === 'admin' || p.created_by === currentUser.id)
@@ -345,7 +373,11 @@ export default function DashboardPage() {
                       </select>
                       <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Shown on the dashboard and on every report for this project (including past ones), unless a report has its own override.</p>
                     </div>
-                    <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Check the users who can edit this project. The project's creator and admins have automatic access.</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                      <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>Check the users who can edit this project. The project's creator and admins have automatic access.</p>
+                      <button onClick={() => setPendingEditorIds(new Set(allUsers.map((u: any) => u.id)))}
+                        style={{ fontSize: 11, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: 10 }}>Grant all ✓</button>
+                    </div>
                     {allUsers.map(u => {
                       const isChecked = pendingEditorIds.has(u.id)
                       return (
