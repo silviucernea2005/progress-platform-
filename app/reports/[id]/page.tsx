@@ -37,6 +37,7 @@ export default function ReportPage() {
   const [dragOver, setDragOver] = useState(false)
   const [editingWeights, setEditingWeights] = useState(false)
   const [weights, setWeights] = useState<Record<number, number>>({})
+  const [originalWeights, setOriginalWeights] = useState<Record<number, number>>({})
   const [photosJustSaved, setPhotosJustSaved] = useState(false)
   const [settingsLoadError, setSettingsLoadError] = useState('')
   const [editingPeriod, setEditingPeriod] = useState(false)
@@ -175,6 +176,7 @@ export default function ReportPage() {
           setConstructionStart(d.constructionStart || ''); setConstructionFinishEstimated(d.constructionFinishEstimated || '')
           setContractStart(d.contractStart || ''); setContractFinish(d.contractFinish || '')
           setWeights(w)
+          setOriginalWeights(w)
           setProjectResponsible(settingsRes?.responsible || '')
         } catch (e) {
           console.error('Error loading project settings:', e)
@@ -259,6 +261,38 @@ export default function ReportPage() {
     }
     setEditingWeights(!editingWeights)
   }
+
+  function cancelEditing() {
+    if (editing) {
+      if (!confirm('Discard your changes to this report?')) return
+      setWorksDone(report.works_done || '')
+      setWorksPlanned(report.works_planned || '')
+      setRedFlags(report.red_flags || '')
+      setResponsible(report.responsible || '')
+      setActivityProgress(Object.fromEntries(acts.map((a: any) => [a.activity_id, a.progress])))
+      setCustomActivities([])
+      setPeriodStart(report.period_start || '')
+      setPeriodEnd(report.period_end || '')
+      setPeriodError('')
+      setEditing(false)
+      setEditingPeriod(false)
+      return
+    }
+    if (editingWeights) {
+      if (!confirm('Discard your changes to weights?')) return
+      setWeights(originalWeights)
+      setEditingWeights(false)
+    }
+  }
+
+  // Escape cancels whichever edit mode is active, after confirming.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && (editing || editingWeights)) cancelEditing()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editing, editingWeights, report, originalWeights])
 
   async function handleAddCategory() {
     if (!newCatName.trim() || !report?.project_id) return
@@ -1496,7 +1530,7 @@ ${photosHtml}
                 </button>
               </div>
             </div>
-            <div style={{ height: chartFullscreen ? 'calc(100vh - 100px)' : 420 }}>
+            <div className={chartFullscreen ? '' : 's7-chart-canvas-wrap'} style={chartFullscreen ? { height: 'calc(100vh - 100px)' } : undefined}>
               <canvas ref={mainChartRef} />
             </div>
           </div>
