@@ -338,7 +338,7 @@ export default function EditProjectPage() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-          <button onClick={() => router.push('/dashboard')} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => router.back()} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
           <button onClick={handleSave} disabled={saving} style={btn(BLUE)}>{saving ? 'Saving...' : 'Save Changes'}</button>
         </div>
       </div>
