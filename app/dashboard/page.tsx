@@ -468,10 +468,13 @@ export default function DashboardPage() {
                   <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #e5e7eb' }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>👥 Anonymous visitors (view-only, no login — count only, never who)</div>
                     {anonVisits.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {anonVisits.map((v: any) => (
-                          <div key={v.visit_date} style={{ fontSize: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '5px 10px' }}>
-                            <strong style={{ color: MCORE_DARK }}>{v.count}</strong> <span style={{ color: '#9ca3af' }}>on {v.visit_date}</span>
+                          <div key={v.visit_date} style={{ fontSize: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '6px 10px' }}>
+                            <div><strong style={{ color: MCORE_DARK }}>{v.count}</strong> <span style={{ color: '#9ca3af' }}>on {v.visit_date}</span></div>
+                            {v.times && v.times.length > 0 && (
+                              <div style={{ color: '#9ca3af', marginTop: 2, fontSize: 11 }}>at {v.times.join(', ')}</div>
+                            )}
                           </div>
                         ))}
                       </div>
