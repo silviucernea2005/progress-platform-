@@ -70,6 +70,20 @@ export default function ReportPage() {
     document.body.style.overflow = chartFullscreen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [chartFullscreen])
+
+  // Same reasoning as the photo lightbox: without this, the browser/mobile Back
+  // button would navigate away from the report instead of just closing fullscreen.
+  function closeChartFullscreen() {
+    if (window.history.state?.s7ChartFullscreen) window.history.back()
+    else setChartFullscreen(false)
+  }
+  useEffect(() => {
+    if (!chartFullscreen) return
+    window.history.pushState({ s7ChartFullscreen: true }, '')
+    function onPopState() { setChartFullscreen(false) }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [chartFullscreen])
   const [deletePhotoMode, setDeletePhotoMode] = useState(false)
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set())
   const [rearrangeMode, setRearrangeMode] = useState(false)
@@ -592,11 +606,29 @@ export default function ReportPage() {
   }
 
   // Photo drag & drop — supports images, PDF, Excel, Word, and now video (extract embedded images/pages/frames automatically)
+  // Mobile/browser Back button support for the photo lightbox: without this, opening
+  // a photo doesn't change the browser's history, so pressing Back just navigates away
+  // from the report entirely (e.g. straight to the dashboard) instead of closing the
+  // photo viewer first. Pushing a history entry when it opens means Back closes the
+  // photo and lands you right back on the report — a real "one step back".
+  function closeLightbox() {
+    if (window.history.state?.s7Lightbox) window.history.back()
+    else setLightboxIndex(null)
+  }
+  useEffect(() => {
+    if (lightboxIndex === null) return
+    window.history.pushState({ s7Lightbox: true }, '')
+    function onPopState() { setLightboxIndex(null) }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxIndex !== null])
+
   useEffect(() => {
     if (lightboxIndex === null) return
     const imagePhotos = photos.filter(p => p.url && !p.url.startsWith('data:text/plain'))
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setLightboxIndex(null)
+      if (e.key === 'Escape') closeLightbox()
       if (e.key === 'ArrowRight') setLightboxIndex(i => i === null ? null : (i + 1) % imagePhotos.length)
       if (e.key === 'ArrowLeft') setLightboxIndex(i => i === null ? null : (i - 1 + imagePhotos.length) % imagePhotos.length)
     }
@@ -1538,7 +1570,7 @@ ${photosHtml}
                     At contract finish: {estimatedAtContractFinish.toFixed(1)}%
                   </div>
                 )}
-                <button onClick={() => setChartFullscreen(!chartFullscreen)}
+                <button onClick={() => chartFullscreen ? closeChartFullscreen() : setChartFullscreen(true)}
                   style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#e5e7eb', cursor: 'pointer', fontSize: 12, padding: '5px 10px' }}>
                   {chartFullscreen ? '✕ Close' : '🔍 Expand'}
                 </button>
@@ -1798,9 +1830,9 @@ ${photosHtml}
         }
 
         return (
-          <div onClick={() => setLightboxIndex(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+          <div onClick={() => closeLightbox()} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'pan-y' }}>
-            <button onClick={(e) => { e.stopPropagation(); setLightboxIndex(null) }}
+            <button onClick={(e) => { e.stopPropagation(); closeLightbox() }}
               style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 40, height: 40, fontSize: 20, cursor: 'pointer' }}>×</button>
 
             {imagePhotos.length > 1 && (
