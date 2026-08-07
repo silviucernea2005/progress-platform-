@@ -456,16 +456,20 @@ export default function DashboardPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>📋 Activity Log</h3>
                   <button onClick={() => setShowActivityLog(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
-                {!loadingLog && anonVisits.length > 0 && (
+                {!loadingLog && (
                   <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #e5e7eb' }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>👥 Anonymous visitors (view-only, no login — count only, never who)</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {anonVisits.map((v: any) => (
-                        <div key={v.visit_date} style={{ fontSize: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '5px 10px' }}>
-                          <strong style={{ color: MCORE_DARK }}>{v.count}</strong> <span style={{ color: '#9ca3af' }}>on {v.visit_date}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {anonVisits.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {anonVisits.map((v: any) => (
+                          <div key={v.visit_date} style={{ fontSize: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '5px 10px' }}>
+                            <strong style={{ color: MCORE_DARK }}>{v.count}</strong> <span style={{ color: '#9ca3af' }}>on {v.visit_date}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>None recorded in the last 14 days. (Your own visits as admin don't count — this only tracks people who are not logged in.)</div>
+                    )}
                   </div>
                 )}
                 {loadingLog ? (
