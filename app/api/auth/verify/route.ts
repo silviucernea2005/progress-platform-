@@ -21,10 +21,14 @@ export async function POST(req: NextRequest) {
       .setProtectedHeader({ alg: 'HS256' }).setExpirationTime('90d').sign(secret)
     const response = NextResponse.json({ ok: true, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
     response.cookies.set('pp_session', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 90, path: '/' })
+    try {
+      await supabase.from('activity_log').insert({ user_id: user.id, user_name: user.name, action: 'user_login', details: `🔑 ${user.name} logged in` })
+    } catch {}
     return response
   } catch (e) {
     return NextResponse.json({ error: 'Eroare server' }, { status: 500 })
   }
 }
+
 
 
