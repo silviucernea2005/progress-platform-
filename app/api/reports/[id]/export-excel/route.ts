@@ -200,8 +200,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
       r++
     }
-    notesSection('✓ WORKS COMPLETED', 'FF166534', report.works_done)
-    notesSection('→ WORKS PLANNED', 'FF1E40AF', report.works_planned)
+    notesSection('✓ WORKS EXECUTED', 'FF166534', report.works_done)
+    notesSection('→ WORKS PLANNED NEXT WEEK', 'FF1E40AF', report.works_planned)
     notesSection('🚩 RED FLAGS', 'FF991B1B', report.red_flags)
 
     // ============ SHEET 2: PHOTOS ============
