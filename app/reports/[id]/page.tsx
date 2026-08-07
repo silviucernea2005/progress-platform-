@@ -13,6 +13,20 @@ const ORANGE = '#D46A28'
 const GRAY_CHART = '#2C2C2C'
 const HEADER_BG = '#1e3a5f'  // pleasant dark blue instead of black
 
+// Records "someone anonymous was here today" — a random id stored in a cookie, no
+// name/email/IP involved. Lets an admin see a daily count, never who it was.
+function trackAnonVisit() {
+  try {
+    const match = document.cookie.match(/s7_anon_id=([^;]+)/)
+    let anonId = match?.[1]
+    if (!anonId) {
+      anonId = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
+      document.cookie = `s7_anon_id=${anonId}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax`
+    }
+    fetch('/api/track-visit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anon_id: anonId }) }).catch(() => {})
+  } catch {}
+}
+
 export default function ReportPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -113,7 +127,7 @@ export default function ReportPage() {
   const chartInstances = useRef<any[]>([])
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => { setCurrentUser(d.user); setAuthChecked(true) }).catch(() => setAuthChecked(true))
+    fetch('/api/auth/me').then(r => r.json()).then(d => { setCurrentUser(d.user); setAuthChecked(true); if (!d.user) trackAnonVisit() }).catch(() => setAuthChecked(true))
   }, [])
 
   // Real per-project permission check — being logged in isn't enough, you need to be
