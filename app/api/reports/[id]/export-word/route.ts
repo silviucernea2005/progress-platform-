@@ -180,8 +180,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     children.push(
-      ...notesSection('✓ WORKS COMPLETED', '166534', report.works_done),
-      ...notesSection('→ WORKS PLANNED', '1E40AF', report.works_planned),
+      ...notesSection('✓ WORKS EXECUTED', '166534', report.works_done),
+      ...notesSection('→ WORKS PLANNED NEXT WEEK', '1E40AF', report.works_planned),
       ...notesSection('🚩 RED FLAGS', '991B1B', report.red_flags),
     )
 
