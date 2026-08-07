@@ -40,7 +40,7 @@ img { max-width: 100%; }
 /* Dashboard reports: table on desktop, card list on mobile (no horizontal scroll) */
 .s7-mobile-cards { display: none; }
 .s7-mobile-menu-btn { display: none; }
-.s7-badges-mobile { display: none; }
+.s7-badges-mobile { display: none !important; }
 
 @media (max-width: 760px) {
   /* Header: keep the hamburger on the same row as the logo (was dropping to its own
@@ -98,3 +98,6 @@ img { max-width: 100%; }
   .s7-mobile-cards { display: block !important; }
   .s7-chart-canvas-wrap { height: 280px !important; }
 }
+
+
+
