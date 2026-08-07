@@ -76,6 +76,7 @@ export default function ReportPage() {
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null)
   const [showPhotoMenu, setShowPhotoMenu] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const touchStartX = useRef<number | null>(null)
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -1783,9 +1784,22 @@ ${photosHtml}
         if (!imagePhotos.length) return null
         const idx = ((lightboxIndex % imagePhotos.length) + imagePhotos.length) % imagePhotos.length
         const current = imagePhotos[idx]
+
+        function handleTouchStart(e: React.TouchEvent) {
+          touchStartX.current = e.touches[0].clientX
+        }
+        function handleTouchEnd(e: React.TouchEvent) {
+          if (touchStartX.current === null) return
+          const deltaX = e.changedTouches[0].clientX - touchStartX.current
+          touchStartX.current = null
+          const SWIPE_THRESHOLD = 50 // pixels — small taps/scrolls shouldn't trigger a page change
+          if (deltaX > SWIPE_THRESHOLD) setLightboxIndex((idx - 1 + imagePhotos.length) % imagePhotos.length)      // swipe right → previous
+          else if (deltaX < -SWIPE_THRESHOLD) setLightboxIndex((idx + 1) % imagePhotos.length)                     // swipe left → next
+        }
+
         return (
-          <div onClick={() => setLightboxIndex(null)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div onClick={() => setLightboxIndex(null)} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'pan-y' }}>
             <button onClick={(e) => { e.stopPropagation(); setLightboxIndex(null) }}
               style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 40, height: 40, fontSize: 20, cursor: 'pointer' }}>×</button>
 
