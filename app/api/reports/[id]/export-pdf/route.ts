@@ -115,11 +115,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   <h2>Works & Notes</h2>
   <div class="text-box">
     <div class="text-card">
-      <h3 style="color:#065f46">✓ Works Completed</h3>
+      <h3 style="color:#065f46">✓ Works Executed</h3>
       <p>${report.works_done || '—'}</p>
     </div>
     <div class="text-card">
-      <h3 style="color:#0C447C">→ Works Planned</h3>
+      <h3 style="color:#0C447C">→ Works Planned Next Week</h3>
       <p>${report.works_planned || '—'}</p>
     </div>
     <div class="text-card">
