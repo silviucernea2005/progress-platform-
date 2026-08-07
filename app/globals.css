@@ -40,6 +40,7 @@ img { max-width: 100%; }
 /* Dashboard reports: table on desktop, card list on mobile (no horizontal scroll) */
 .s7-mobile-cards { display: none; }
 .s7-mobile-menu-btn { display: none; }
+.s7-badges-mobile { display: none; }
 
 @media (max-width: 760px) {
   /* Header: keep the hamburger on the same row as the logo (was dropping to its own
@@ -64,6 +65,8 @@ img { max-width: 100%; }
   .s7-header-actions.s7-mobile-open > * { width: 100% !important; justify-content: flex-start !important; text-align: left !important; }
   .s7-score-box { flex-direction: column !important; align-items: flex-start !important; gap: 14px !important; }
   .s7-score-box .s7-score-right { align-self: stretch !important; text-align: left !important; }
+  .s7-badges-desktop { display: none !important; }
+  .s7-badges-mobile { display: flex !important; }
   .s7-grid-2, .s7-grid-3, .s7-grid-4 { grid-template-columns: 1fr !important; }
   .s7-photo-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .s7-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
