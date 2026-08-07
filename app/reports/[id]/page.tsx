@@ -1256,8 +1256,8 @@ ${photosHtml}
             <div style={{ width: 36, height: 2, background: MCORE_RED, margin: '2px 0 2px' }} />
             <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.2 }}>SQUARE 7</div>
           </div>
-          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
-          <span style={{ fontWeight: 500, fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
+          <div className="s7-header-divider" style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 8px' }} />
+          <span className="s7-header-subtitle" style={{ fontWeight: 500, fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
@@ -1445,18 +1445,20 @@ ${photosHtml}
               {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
               </p>}
-              {getDelayBadge() && (
-                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
-                  <span style={{ fontSize: 15 }}>{getDelayBadge()!.icon}</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: getDelayBadge()!.color }}>{getDelayBadge()!.text}</span>
-                </div>
-              )}
-              {estimatedAtContractFinish !== null && (
-                <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Estimated at contract finish:</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: trendColor }}>{estimatedAtContractFinish.toFixed(1)}%</span>
-                </div>
-              )}
+              <div className="s7-status-badges" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                {getDelayBadge() && (
+                  <div className="s7-badge-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                    <span className="s7-badge-icon" style={{ fontSize: 15 }}>{getDelayBadge()!.icon}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: getDelayBadge()!.color }}>{getDelayBadge()!.text}</span>
+                  </div>
+                )}
+                {estimatedAtContractFinish !== null && (
+                  <div className="s7-badge-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Estimated at contract finish:</span>
+                    <span className="s7-badge-big-value" style={{ fontSize: 18, fontWeight: 700, color: trendColor }}>{estimatedAtContractFinish.toFixed(1)}%</span>
+                  </div>
+                )}
+              </div>
               {trendFinishDate && (
                 <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                   At current pace, project finishes: <strong style={{ color: trendLineColor }}>{trendFinishDate}</strong>
