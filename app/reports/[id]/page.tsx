@@ -29,6 +29,7 @@ export default function ReportPage() {
   const [redFlags, setRedFlags] = useState('')
   const [responsible, setResponsible] = useState('')
   const [projectResponsible, setProjectResponsible] = useState('')
+  const [activityOverrides, setActivityOverrides] = useState<Record<string, { name?: string; excluded?: boolean }>>({})
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDates, setShowDates] = useState(false)
@@ -38,6 +39,7 @@ export default function ReportPage() {
   const [editingWeights, setEditingWeights] = useState(false)
   const [weights, setWeights] = useState<Record<number, number>>({})
   const [originalWeights, setOriginalWeights] = useState<Record<number, number>>({})
+  const [originalDates, setOriginalDates] = useState<Record<string, string>>({})
   const [photosJustSaved, setPhotosJustSaved] = useState(false)
   const [settingsLoadError, setSettingsLoadError] = useState('')
   const [editingPeriod, setEditingPeriod] = useState(false)
@@ -175,9 +177,11 @@ export default function ReportPage() {
           setContractingFinish(d.contractingFinish || ''); setConstructionProceedNotice(d.constructionProceedNotice || '')
           setConstructionStart(d.constructionStart || ''); setConstructionFinishEstimated(d.constructionFinishEstimated || '')
           setContractStart(d.contractStart || ''); setContractFinish(d.contractFinish || '')
+          setOriginalDates(d)
           setWeights(w)
           setOriginalWeights(w)
           setProjectResponsible(settingsRes?.responsible || '')
+          setActivityOverrides(settingsRes?.activity_overrides || {})
         } catch (e) {
           console.error('Error loading project settings:', e)
           setSettingsLoadError('Unexpected error loading project data from the server.')
@@ -216,28 +220,6 @@ export default function ReportPage() {
     })
   }, [id])
 
-  async function saveDates() {
-    if (!report?.project_id) return
-    const dates = {
-      tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish,
-      contractingStart, contractingReviewLegal, contractingFinish,
-      constructionProceedNotice, constructionStart, constructionFinishEstimated,
-      contractStart, contractFinish
-    }
-    try {
-      const res = await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates }) })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        alert(`Could not save the data to the server: ${err.error || res.status}. The data will NOT be visible on other computers until this is fixed.`)
-        return
-      }
-    } catch {
-      alert('Network error saving the data. Check your connection and try again.')
-      return
-    }
-    setShowDates(false)
-  }
-
   function getWeight(activityId: number, defaultWeight: number) {
     return weights[activityId] !== undefined ? weights[activityId] : defaultWeight
   }
@@ -274,6 +256,13 @@ export default function ReportPage() {
       setPeriodStart(report.period_start || '')
       setPeriodEnd(report.period_end || '')
       setPeriodError('')
+      const d = originalDates
+      setTenderStart(d.tenderStart || ''); setTenderOffersReceived(d.tenderOffersReceived || '')
+      setTenderOffersReview(d.tenderOffersReview || ''); setTenderFinish(d.tenderFinish || '')
+      setContractingStart(d.contractingStart || ''); setContractingReviewLegal(d.contractingReviewLegal || '')
+      setContractingFinish(d.contractingFinish || ''); setConstructionProceedNotice(d.constructionProceedNotice || '')
+      setConstructionStart(d.constructionStart || ''); setConstructionFinishEstimated(d.constructionFinishEstimated || '')
+      setContractStart(d.contractStart || ''); setContractFinish(d.contractFinish || '')
       setEditing(false)
       setEditingPeriod(false)
       return
@@ -346,7 +335,13 @@ export default function ReportPage() {
         return
       }
       if (report?.project_id) {
-        await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).catch(() => {})
+        const dates = {
+          tenderStart, tenderOffersReceived, tenderOffersReview, tenderFinish,
+          contractingStart, contractingReviewLegal, contractingFinish,
+          constructionProceedNotice, constructionStart, constructionFinishEstimated,
+          contractStart, contractFinish
+        }
+        await fetch(`/api/projects/${report.project_id}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights, dates }) }).catch(() => {})
       }
       const newRows = customActivities.map((ca: any) => ({ activity_id: ca.id, progress: activityProgress[ca.id] ?? 0, activity: ca }))
       setReport((r: any) => ({
@@ -1205,11 +1200,11 @@ ${miniChartsHtml}
   <h2>Works & Notes</h2>
   <div class="text-box">
     <div class="text-card">
-      <h3 style="color:#065f46">✓ Works Completed</h3>
+      <h3 style="color:#065f46">✓ Works Executed</h3>
       <p>${worksDone || '—'}</p>
     </div>
     <div class="text-card">
-      <h3 style="color:#0C447C">→ Works Planned</h3>
+      <h3 style="color:#0C447C">→ Works Planned Next Week</h3>
       <p>${worksPlanned || '—'}</p>
     </div>
     <div class="text-card">
@@ -1356,8 +1351,7 @@ ${photosHtml}
         {showDates && (
           <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Project Dates</h2>
-              <button className="s7-btn" onClick={saveDates} style={btn(BLUE)}>Save & Hide</button>
+              <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Project Dates {!editing && <span style={{ fontSize: 11, fontWeight: 400, color: '#9ca3af' }}>(view only — use Edit Report to change)</span>}</h2>
             </div>
             <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
               {[
@@ -1371,7 +1365,11 @@ ${photosHtml}
                   {section.fields.map(([label, value, setter]: any) => (
                     <div key={label} style={{ marginBottom: 8 }}>
                       <label style={lbl}>{label}</label>
-                      <input type="date" value={value} onChange={e => setter(e.target.value)} style={inp} />
+                      {editing ? (
+                        <input type="date" value={value} onChange={e => setter(e.target.value)} style={inp} />
+                      ) : (
+                        <div style={{ fontSize: 13, color: value ? MCORE_DARK : '#d1d5db', padding: '6px 0' }}>{value || '—'}</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1383,16 +1381,17 @@ ${photosHtml}
         {/* WEIGHTS EDITOR */}
         {editingWeights && (
           <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20, marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Activity Weights</h2>
               <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 6, background: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#ecfdf5' : '#fef2f2', color: acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0) === 100 ? '#065f46' : '#dc2626' }}>
                 Total: {acts.reduce((s: number, a: any) => s + (weights[a.activity_id] ?? a.activity?.default_weight ?? 0), 0)}%
               </span>
             </div>
+            <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 14px' }}>To rename or hide a category, go to <a href={`/projects/${report.project_id}/edit`} style={{ color: BLUE }}>Edit Project</a> from the dashboard.</p>
             <div className="s7-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-              {acts.map((a: any) => (
+              {acts.filter((a: any) => !activityOverrides[a.activity_id]?.excluded).map((a: any) => (
                 <div key={a.activity_id} style={{ background: '#f9fafb', borderRadius: 8, padding: 10 }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{a.activity?.name}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: MCORE_DARK, marginBottom: 6 }}>{activityOverrides[a.activity_id]?.name || a.activity?.name}</div>
                   <input type="number" min={0} max={100} value={weights[a.activity_id] ?? a.activity?.default_weight ?? 0}
                     onChange={e => setWeights(prev => ({ ...prev, [a.activity_id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
                     onFocus={e => e.target.select()}
@@ -1539,13 +1538,19 @@ ${photosHtml}
           </div>
           {acts.map((a: any) => {
             const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
-            const displayProgress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
+            // The bar (and its overlaid %) always reflects the last-SAVED progress —
+            // it does NOT track what's being typed in the input. That way, clearing
+            // the input by accident never makes you lose track of where you actually
+            // were; the number only changes for real once you hit Save.
+            const savedProgress = a.progress
+            const draftProgress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
             return (
               <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
                 <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
                 {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
-                <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
+                <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 16, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 99, width: `${savedProgress}%`, background: savedProgress === 100 ? '#4ade80' : savedProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
+                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: savedProgress > 45 ? '#fff' : '#374151' }}>{savedProgress}%</span>
                 </div>
                 {editing ? (
                   <input type="number" min={0} max={100} value={activityProgress[a.activity_id] ?? a.progress}
@@ -1555,28 +1560,32 @@ ${photosHtml}
                 ) : (
                   <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
                 )}
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: displayProgress === 0 ? '#f3f4f6' : displayProgress < 100 ? '#dbeafe' : '#dcfce7', color: displayProgress === 0 ? '#6b7280' : displayProgress < 100 ? '#1e40af' : '#166534' }}>
-                  {displayProgress === 0 ? 'Not started' : displayProgress < 100 ? 'In progress' : 'Completed'}
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: savedProgress === 0 ? '#f3f4f6' : savedProgress < 100 ? '#dbeafe' : '#dcfce7', color: savedProgress === 0 ? '#6b7280' : savedProgress < 100 ? '#1e40af' : '#166534' }}>
+                  {savedProgress === 0 ? 'Not started' : savedProgress < 100 ? 'In progress' : 'Completed'}
                 </span>
+                {editing && draftProgress !== savedProgress && (
+                  <span style={{ fontSize: 10.5, color: ORANGE, fontWeight: 600 }}>→ will become {draftProgress}%</span>
+                )}
               </div>
             )
           })}
           {editing && customActivities.map((ca: any) => {
             const w = weights[ca.id] ?? 0
-            const displayProgress = activityProgress[ca.id] ?? 0
+            const draftProgress = activityProgress[ca.id] ?? 0
             return (
               <div key={ca.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
                 <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(new)</span></span>
                 {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
-                <div style={{ flex: '2 1 90px', minWidth: 60, height: 7, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, width: `${displayProgress}%`, background: displayProgress === 100 ? '#4ade80' : displayProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
+                <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 16, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 99, width: `${draftProgress}%`, background: draftProgress === 100 ? '#4ade80' : draftProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
+                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: draftProgress > 45 ? '#fff' : '#374151' }}>{draftProgress}%</span>
                 </div>
-                <input type="number" min={0} max={100} value={displayProgress}
+                <input type="number" min={0} max={100} value={draftProgress}
                   onChange={e => setActivityProgress(prev => ({ ...prev, [ca.id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
                   onFocus={e => e.target.select()}
                   style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: displayProgress === 0 ? '#f3f4f6' : displayProgress < 100 ? '#dbeafe' : '#dcfce7', color: displayProgress === 0 ? '#6b7280' : displayProgress < 100 ? '#1e40af' : '#166534' }}>
-                  {displayProgress === 0 ? 'Not started' : displayProgress < 100 ? 'In progress' : 'Completed'}
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: draftProgress === 0 ? '#f3f4f6' : draftProgress < 100 ? '#dbeafe' : '#dcfce7', color: draftProgress === 0 ? '#6b7280' : draftProgress < 100 ? '#1e40af' : '#166534' }}>
+                  {draftProgress === 0 ? 'Not started' : draftProgress < 100 ? 'In progress' : 'Completed'}
                 </span>
               </div>
             )
@@ -1606,8 +1615,8 @@ ${photosHtml}
         {/* TEXT SECTIONS */}
         <div className="s7-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
           {[
-            { label: '✓ Works completed', value: worksDone, setter: setWorksDone, color: '#065f46', key: 'done' },
-            { label: '→ Works planned', value: worksPlanned, setter: setWorksPlanned, color: BLUE_DARK, key: 'planned' },
+            { label: '✓ Works executed', value: worksDone, setter: setWorksDone, color: '#065f46', key: 'done' },
+            { label: '→ Works planned next week', value: worksPlanned, setter: setWorksPlanned, color: BLUE_DARK, key: 'planned' },
             { label: '🚩 Red Flags', value: redFlags, setter: setRedFlags, color: '#7f1d1d', key: 'flags' },
           ].map(section => (
             <div key={section.key} className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18 }}>
