@@ -32,6 +32,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { data, error } = await supabase.from('projects').insert({ ...body, created_by: user.sub }).select().single()
     if (error) throw error
+    // Whoever creates a project automatically gets edit access and becomes the
+    // default Responsible — both can still be changed later from Manage Access.
+    try {
+      await supabase.from('project_editors').insert({ project_id: data.id, user_id: user.sub })
+      await supabase.from('project_settings').upsert({ project_id: data.id, responsible: user.name })
+    } catch {}
     try {
       await supabase.from('activity_log').insert({ user_id: user.sub, user_name: user.name, action: 'project_created', details: `${user.name} created project "${data.name}"`, project_id: data.id })
     } catch {}
