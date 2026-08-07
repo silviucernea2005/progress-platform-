@@ -230,8 +230,8 @@ export default function DashboardPage() {
             <div style={{ width: 42, height: 2, background: MCORE_RED, margin: '3px 0 3px' }} />
             <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: 1.4 }}>SQUARE 7</div>
           </div>
-          <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
-          <span style={{ fontWeight: 500, fontSize: 15, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
+          <div className="s7-header-divider" style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.15)', margin: '0 10px' }} />
+          <span className="s7-header-subtitle" style={{ fontWeight: 500, fontSize: 15, color: 'rgba(255,255,255,0.75)' }}>Progress Platform</span>
         </div>
         <button className="s7-mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           style={{ display: 'none', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 6, color: '#fff', width: 36, height: 32, fontSize: 16, cursor: 'pointer' }}>☰</button>
@@ -268,7 +268,7 @@ export default function DashboardPage() {
           <div style={{ padding: '16px 16px 8px', fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 1.2 }}>PROJECTS</div>
 
           <div style={{ padding: '0 12px 12px' }}>
-            <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }}
+            <Link className="s7-btn s7-sidebar-newproject-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }}
               style={{ ...btn(GREEN), display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', fontWeight: 600, fontSize: 12, padding: '8px 0', boxSizing: 'border-box' }}>
               + New Project
             </Link>
@@ -276,7 +276,7 @@ export default function DashboardPage() {
 
           {/* Dropdown for mobile / quick select */}
           <div style={{ padding: '0 12px 12px' }}>
-            <select value={selectedProject} onChange={e => selectProject(e.target.value)}
+            <select className="s7-sidebar-project-select" value={selectedProject} onChange={e => selectProject(e.target.value)}
               style={{ width: '100%', border: '1px solid #e5e7eb', borderRadius: 7, padding: '7px 10px', fontSize: 12, color: MCORE_DARK, background: '#f9fafb' }}>
               <option value="all">All Projects</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -335,15 +335,15 @@ export default function DashboardPage() {
         {/* MAIN */}
         <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
           {/* KPIs */}
-          <div className="s7-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+          <div className="s7-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
             {[
               { label: 'Active Projects', value: loading ? '—' : projects.filter(p => p.status === 'active').length, color: BLUE_DARK },
               { label: 'Total Reports', value: loading ? '—' : filteredReports.length, color: '#374151' },
               { label: 'Completed Projects', value: loading ? '—' : projects.filter(p => p.status === 'completed').length, color: '#3B6D11' },
             ].map(k => (
-              <div key={k.label} className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '16px 20px' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: k.color }}>{k.value}</div>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>{k.label}</div>
+              <div key={k.label} className="s7-card s7-kpi-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '16px 20px' }}>
+                <div className="s7-kpi-value" style={{ fontSize: 28, fontWeight: 700, color: k.color }}>{k.value}</div>
+                <div className="s7-kpi-label" style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>{k.label}</div>
               </div>
             ))}
           </div>
