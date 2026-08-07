@@ -1320,9 +1320,13 @@ ${photosHtml}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>📅 {showDates ? 'Hide dates' : 'Visualize Dates'}</button>
                 <button onClick={() => { setShowMiniCharts(!showMiniCharts); setShowActionsMenu(false) }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: MCORE_DARK, background: 'none', border: 'none', cursor: 'pointer' }}>{showMiniCharts ? '🙈 Hide mini charts' : '👁️ Show mini charts'}</button>
-                <div style={{ height: 1, background: '#f0f0f0' }} />
-                <button onClick={() => { setShowActionsMenu(false); if (requireLogin()) toggleFullEdit() }}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: editing ? ORANGE : MCORE_DARK, fontWeight: editing ? 700 : 400, background: 'none', border: 'none', cursor: 'pointer', opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+                {currentUser && (
+                  <>
+                    <div style={{ height: 1, background: '#f0f0f0' }} />
+                    <button onClick={() => { setShowActionsMenu(false); toggleFullEdit() }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: editing ? ORANGE : MCORE_DARK, fontWeight: editing ? 700 : 400, background: 'none', border: 'none', cursor: 'pointer', opacity: !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1342,10 +1346,16 @@ ${photosHtml}
             )}
           </div>
 
-          <button className="s7-btn" onClick={() => { if (requireLogin()) handleNewReport() }} style={{ ...btn(BLUE), opacity: currentUser && !canEdit ? 0.4 : 1 }}>+ New Report</button>
+          {currentUser && (
+            <button className="s7-btn" onClick={handleNewReport} style={{ ...btn(BLUE), opacity: !canEdit ? 0.4 : 1 }}>+ New Report</button>
+          )}
 
-          <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
-          <button className="s7-btn" onClick={() => { if (requireLogin()) deleteReport() }} disabled={deleting} style={{ ...btn(DELETE_RED), opacity: currentUser && !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
+          {currentUser && (
+            <>
+              <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
+              <button className="s7-btn" onClick={deleteReport} disabled={deleting} style={{ ...btn(DELETE_RED), opacity: !canEdit ? 0.4 : 1 }}>🗑 Delete</button>
+            </>
+          )}
 
           <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
           <button className="s7-btn" onClick={() => router.push('/dashboard')}
