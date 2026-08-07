@@ -42,8 +42,11 @@ img { max-width: 100%; }
 .s7-mobile-menu-btn { display: none; }
 
 @media (max-width: 760px) {
-  .s7-header-row { flex-wrap: wrap !important; row-gap: 10px !important; }
-  .s7-mobile-menu-btn { display: flex !important; align-items: center; justify-content: center; }
+  /* Header: keep the hamburger on the same row as the logo (was dropping to its own
+     row below), by not wrapping and shrinking the logo block instead. */
+  .s7-header-row { flex-wrap: nowrap !important; padding: 10px 14px !important; }
+  .s7-header-divider, .s7-header-subtitle { display: none !important; }
+  .s7-mobile-menu-btn { display: flex !important; align-items: center; justify-content: center; flex-shrink: 0; }
   .s7-header-actions { display: none !important; }
   .s7-header-actions.s7-mobile-open {
     display: flex !important;
@@ -66,6 +69,24 @@ img { max-width: 100%; }
   .s7-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
   .s7-table-wrap table { min-width: 620px !important; }
   .s7-main-pad { padding: 12px !important; }
+
+  /* Dashboard: sidebar's "New Project" quieter, project selector more prominent —
+     the project you're looking at should stand out more than the create action. */
+  .s7-sidebar-newproject-btn { font-size: 11px !important; padding: 5px 0 !important; opacity: 0.8; }
+  .s7-sidebar-project-select { font-size: 15px !important; font-weight: 700 !important; padding: 9px 10px !important; border: 2px solid #1A1A2A !important; color: #1A1A2A !important; background: #fff !important; }
+
+  /* Dashboard KPI cards: stay 3-in-a-row but compact, instead of stacking full-width */
+  .s7-kpi-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 6px !important; }
+  .s7-kpi-card { padding: 8px 6px !important; text-align: center; }
+  .s7-kpi-value { font-size: 17px !important; }
+  .s7-kpi-label { font-size: 8.5px !important; margin-top: 1px !important; line-height: 1.2; }
+
+  /* Report header status badges: tighter so they group side-by-side instead of
+     each taking a full row */
+  .s7-badge-pill { padding: 4px 9px !important; }
+  .s7-badge-pill span { font-size: 11px !important; }
+  .s7-badge-big-value { font-size: 14px !important; }
+  .s7-badge-icon { font-size: 13px !important; }
   .s7-dash-filters { flex-wrap: wrap !important; }
   .s7-dash-body { flex-direction: column !important; }
   .s7-dash-sidebar { width: 100% !important; border-right: none !important; border-bottom: 1px solid #e5e7eb !important; max-height: 260px !important; }
