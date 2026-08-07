@@ -259,13 +259,17 @@ export default function DashboardPage() {
         <nav className={`s7-header-actions${mobileMenuOpen ? ' s7-mobile-open' : ''}`} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', marginRight: 4 }} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '5px 8px' }}>
-            <Link className="s7-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
+            {currentUser && (
+              <Link className="s7-btn" href="/projects/new" style={{ ...btn(GREEN), fontWeight: 600 }}>+ New Project</Link>
+            )}
             {currentUser?.role === 'admin' && (
               <Link className="s7-btn" href={selectedProject !== 'all' ? `/projects/${selectedProject}/edit` : '#'}
                 onClick={e => { if (selectedProject === 'all') { e.preventDefault(); alert('Select a specific project in the sidebar first.') } }}
-                style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600, opacity: selectedProject === 'all' ? 0.5 : 1 }}>✏️ Edit Project</Link>
+                style={{ ...btn('#7C3AED'), fontWeight: 600, opacity: selectedProject === 'all' ? 0.5 : 1 }}>✏️ Edit Project</Link>
             )}
-            <Link className="s7-btn" href="/reports/new" onClick={e => { if (!requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
+            {currentUser && (
+              <Link className="s7-btn" href="/reports/new" style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
+            )}
             {currentUser?.role === 'admin' && (
               <button className="s7-btn" onClick={openActivityLog} style={btn('#5C6AC4')}>📋 Activity Log</button>
             )}
@@ -288,12 +292,14 @@ export default function DashboardPage() {
         <aside className="s7-dash-sidebar" style={{ width: 230, background: '#fff', borderRight: '1px solid #e5e7eb', flexShrink: 0, overflowY: 'auto' }}>
           <div style={{ padding: '16px 16px 8px', fontSize: 10, fontWeight: 700, color: '#9ca3af', letterSpacing: 1.2 }}>PROJECTS</div>
 
-          <div style={{ padding: '0 12px 12px' }}>
-            <Link className="s7-btn s7-sidebar-newproject-btn" href="/projects/new" onClick={e => { if (!requireLogin()) e.preventDefault() }}
-              style={{ ...btn(GREEN), display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', fontWeight: 600, fontSize: 12, padding: '8px 0', boxSizing: 'border-box' }}>
-              + New Project
-            </Link>
-          </div>
+          {currentUser && (
+            <div style={{ padding: '0 12px 12px' }}>
+              <Link className="s7-btn s7-sidebar-newproject-btn" href="/projects/new"
+                style={{ ...btn(GREEN), display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', fontWeight: 600, fontSize: 12, padding: '8px 0', boxSizing: 'border-box' }}>
+                + New Project
+              </Link>
+            </div>
+          )}
 
           {/* Dropdown for mobile / quick select */}
           <div style={{ padding: '0 12px 12px' }}>
@@ -405,7 +411,9 @@ export default function DashboardPage() {
               {currentUser?.role === 'admin' && selectedProject !== 'all' && (
                 <button className="s7-btn" onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
               )}
-              <Link className="s7-btn" href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (selectedProject !== 'all' ? !requireEditRights(selectedProject) : !requireLogin()) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
+              {currentUser && (
+                <Link className="s7-btn" href={selectedProject !== 'all' ? `/reports/new?project=${selectedProject}` : '/reports/new'} onClick={e => { if (selectedProject !== 'all' && !requireEditRights(selectedProject)) e.preventDefault() }} style={{ ...btn(BLUE), fontWeight: 600 }}>+ New Report</Link>
+              )}
             </div>
           </div>
 
@@ -534,7 +542,9 @@ export default function DashboardPage() {
                                   : <span title="Has attachments" style={{ fontSize: 14 }}>📎</span>
                               })()}
                               <Link className="s7-btn" href={`/reports/${r.id}`} style={{ ...btn(BLUE), padding: '5px 12px', fontSize: 12 }}>View</Link>
-                              <Link className="s7-btn" href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
+                              {currentUser && (
+                                <Link className="s7-btn" href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '5px 12px', fontSize: 12 }}>Edit</Link>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -575,7 +585,9 @@ export default function DashboardPage() {
                         <span style={{ fontSize: 12, fontWeight: 600, color: MCORE_DARK }}>{prog.toFixed(1)}%</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
-                        <Link className="s7-btn" href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
+                        {currentUser && (
+                          <Link className="s7-btn" href={`/reports/${r.id}?edit=1`} onClick={e => { if (!requireEditRights(r.project_id)) e.preventDefault() }} style={{ ...btn('#f3f4f6', '#374151'), padding: '6px 14px', fontSize: 12, flex: 1, justifyContent: 'center' }}>Edit</Link>
+                        )}
                       </div>
                     </div>
                   )
