@@ -29,7 +29,6 @@ function NewReportForm() {
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
   const [worksDone, setWorksDone] = useState('')
-  const [responsible, setResponsible] = useState('')
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
   const [activities, setActivities] = useState(ACTIVITIES.map(a => ({ ...a, progress: 0 })))
@@ -252,11 +251,16 @@ function NewReportForm() {
     ]).then(([acts, settings, reportsList]) => {
       if (!Array.isArray(acts)) return
       const w = settings?.weights || {}
+      const overrides = settings?.activity_overrides || {}
       const latest = Array.isArray(reportsList) && reportsList.length ? reportsList[0] : null
-      setActivities(acts.map((a: any) => {
-        const found = latest?.activities?.find((x: any) => x.activity_id === a.id)
-        return { id: a.id, name: a.name, weight: w[a.id] !== undefined ? w[a.id] : a.default_weight, progress: found ? found.progress : 0 }
-      }))
+      setActivities(
+        acts
+          .filter((a: any) => !overrides[a.id]?.excluded)
+          .map((a: any) => {
+            const found = latest?.activities?.find((x: any) => x.activity_id === a.id)
+            return { id: a.id, name: overrides[a.id]?.name || a.name, weight: w[a.id] !== undefined ? w[a.id] : a.default_weight, progress: found ? found.progress : 0 }
+          })
+      )
     }).catch(() => {})
   }, [projectId])
 
@@ -294,7 +298,6 @@ function NewReportForm() {
         works_done: worksDone,
         works_planned: worksPlanned,
         red_flags: redFlags,
-        responsible: responsible || null,
         activities: activities.map(a => ({ activity_id: a.id, progress: a.progress })),
         payments: [],
         created_by: null
@@ -356,13 +359,9 @@ function NewReportForm() {
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div><label style={lbl}>Period start</label><input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inp} /></div>
             <div><label style={lbl}>Period end</label><input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inp} /></div>
-          </div>
-          <div>
-            <label style={lbl}>Responsible (optional)</label>
-            <input value={responsible} onChange={e => setResponsible(e.target.value)} style={inp} placeholder="e.g. Horia Ghitescu" />
           </div>
         </div>
 
@@ -435,12 +434,12 @@ function NewReportForm() {
           <h2 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: MCORE_DARK }}>Works & Notes</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
             <div>
-              <label style={lbl}>Works completed</label>
+              <label style={lbl}>Works executed</label>
               <textarea value={worksDone} onChange={e => setWorksDone(e.target.value)} rows={4}
                 style={{ ...inp, resize: 'none' }} placeholder="- Work 1&#10;- Work 2" />
             </div>
             <div>
-              <label style={lbl}>Works planned</label>
+              <label style={lbl}>Works planned next week</label>
               <textarea value={worksPlanned} onChange={e => setWorksPlanned(e.target.value)} rows={4}
                 style={{ ...inp, resize: 'none' }} placeholder="- Planned 1&#10;- Planned 2" />
             </div>
