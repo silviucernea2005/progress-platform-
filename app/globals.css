@@ -28,7 +28,11 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 
 /* Prevent the whole page from scrolling sideways on phones, regardless of which
    element would otherwise overflow (canvases, wide rows, etc.) */
-html, body { overflow-x: hidden; max-width: 100%; }
+/* NOTE: we intentionally do NOT set overflow-x:hidden on html/body — that breaks
+   position:sticky for every header in the app (a well-known CSS interaction: any
+   overflow value other than 'visible' on an ancestor affects sticky descendants).
+   max-width + the canvas/img rules below are enough to stop sideways scrolling. */
+html, body { max-width: 100%; }
 canvas { max-width: 100% !important; }
 img { max-width: 100%; }
 
