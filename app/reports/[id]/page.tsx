@@ -1445,7 +1445,9 @@ ${photosHtml}
               {contractFinish && <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>
                 Contract finish: {contractFinish} · Days remaining: {daysBetween(today, contractFinish)}
               </p>}
-              <div className="s7-status-badges" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              {/* Desktop position — unchanged from before, inside the left column.
+                  Hidden on mobile (see .s7-badges-mobile below instead). */}
+              <div className="s7-status-badges s7-badges-desktop" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 {getDelayBadge() && (
                   <div className="s7-badge-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
                     <span className="s7-badge-icon" style={{ fontSize: 15 }}>{getDelayBadge()!.icon}</span>
@@ -1460,7 +1462,7 @@ ${photosHtml}
                 )}
               </div>
               {trendFinishDate && (
-                <div style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
+                <div className="s7-badges-desktop" style={{ marginTop: 6, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
                   At current pace, project finishes: <strong style={{ color: trendLineColor }}>{trendFinishDate}</strong>
                 </div>
               )}
@@ -1470,6 +1472,28 @@ ${photosHtml}
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>weighted progress</div>
               {weeklyProgress > 0 && <div style={{ fontSize: 13, color: ORANGE, fontWeight: 600, marginTop: 4 }}>+{weeklyProgress}% this week</div>}
             </div>
+          </div>
+          {/* Mobile-only position — full width of the box, so badges have room to sit
+              side-by-side instead of being squeezed into the narrow left column. */}
+          <div className="s7-status-badges s7-badges-mobile" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+            {getDelayBadge() && (
+              <div className="s7-badge-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                <span className="s7-badge-icon" style={{ fontSize: 15 }}>{getDelayBadge()!.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: getDelayBadge()!.color }}>{getDelayBadge()!.text}</span>
+              </div>
+            )}
+            {estimatedAtContractFinish !== null && (
+              <div className="s7-badge-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Estimated at contract finish:</span>
+                <span className="s7-badge-big-value" style={{ fontSize: 18, fontWeight: 700, color: trendColor }}>{estimatedAtContractFinish.toFixed(1)}%</span>
+              </div>
+            )}
+            {trendFinishDate && (
+              <div className="s7-badge-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 12px' }}>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>Finishes:</span>
+                <strong style={{ fontSize: 13, color: trendLineColor }}>{trendFinishDate}</strong>
+              </div>
+            )}
           </div>
           <div style={{ marginTop: 14, height: 6, background: 'rgba(255,255,255,0.15)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{ height: '100%', background: allReports.length >= 1 ? '#059669' : ORANGE, borderRadius: 99, width: `${Math.min(totalProgress, 100)}%`, transition: 'width 0.5s' }} />
