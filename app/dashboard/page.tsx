@@ -11,6 +11,20 @@ const BLUE_DARK = '#0C447C'
 const ORANGE = '#D46A28'
 const GREEN = '#3B9E4A'
 
+// Records "someone anonymous was here today" — a random id stored in a cookie, no
+// name/email/IP involved. Lets an admin see a daily count, never who it was.
+function trackAnonVisit() {
+  try {
+    const match = document.cookie.match(/s7_anon_id=([^;]+)/)
+    let anonId = match?.[1]
+    if (!anonId) {
+      anonId = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
+      document.cookie = `s7_anon_id=${anonId}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax`
+    }
+    fetch('/api/track-visit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anon_id: anonId }) }).catch(() => {})
+  } catch {}
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [projects, setProjects] = useState<any[]>([])
@@ -31,14 +45,18 @@ export default function DashboardPage() {
   const [showActivityLog, setShowActivityLog] = useState(false)
   const [activityLog, setActivityLog] = useState<any[]>([])
   const [loadingLog, setLoadingLog] = useState(false)
+  const [anonVisits, setAnonVisits] = useState<any[]>([])
 
   async function openActivityLog() {
     setShowActivityLog(true)
     setLoadingLog(true)
     try {
-      const res = await fetch('/api/activity-log')
-      const data = await res.json()
-      setActivityLog(Array.isArray(data) ? data : [])
+      const [logRes, visitsRes] = await Promise.all([
+        fetch('/api/activity-log').then(r => r.json()),
+        fetch('/api/anon-visits').then(r => r.json()).catch(() => []),
+      ])
+      setActivityLog(Array.isArray(logRes) ? logRes : [])
+      setAnonVisits(Array.isArray(visitsRes) ? visitsRes : [])
     } catch {
       alert('Could not load the activity log.')
     }
@@ -89,7 +107,10 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => setCurrentUser(d.user)).catch(() => {})
+    fetch('/api/auth/me').then(r => r.json()).then(d => {
+      setCurrentUser(d.user)
+      if (!d.user) trackAnonVisit()
+    }).catch(() => {})
   }, [])
 
   const [canEditMap, setCanEditMap] = useState<Record<string, boolean>>({})
@@ -435,6 +456,18 @@ export default function DashboardPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: MCORE_DARK }}>📋 Activity Log</h3>
                   <button onClick={() => setShowActivityLog(false)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9ca3af' }}>×</button>
                 </div>
+                {!loadingLog && anonVisits.length > 0 && (
+                  <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid #e5e7eb' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>👥 Anonymous visitors (view-only, no login — count only, never who)</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {anonVisits.map((v: any) => (
+                        <div key={v.visit_date} style={{ fontSize: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '5px 10px' }}>
+                          <strong style={{ color: MCORE_DARK }}>{v.count}</strong> <span style={{ color: '#9ca3af' }}>on {v.visit_date}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {loadingLog ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[1, 2, 3, 4].map(i => <div key={i} className="s7-skeleton" style={{ height: 32 }} />)}
