@@ -1276,10 +1276,6 @@ ${photosHtml}
                 <div style={{ height: 1, background: '#f0f0f0' }} />
                 <button onClick={() => { setShowActionsMenu(false); if (requireLogin()) toggleFullEdit() }}
                   style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: editing ? ORANGE : MCORE_DARK, fontWeight: editing ? 700 : 400, background: 'none', border: 'none', cursor: 'pointer', opacity: currentUser && !canEdit ? 0.4 : 1 }}>✏️ {editing ? 'Editing…' : 'Edit Report'}</button>
-                {currentUser?.role === 'admin' && (
-                  <button onClick={() => { setShowActionsMenu(false); toggleWeightsEdit() }}
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: editingWeights ? ORANGE : MCORE_DARK, fontWeight: editingWeights ? 700 : 400, background: 'none', border: 'none', cursor: 'pointer' }}>⚖️ Weights</button>
-                )}
               </div>
             )}
           </div>
@@ -1545,26 +1541,30 @@ ${photosHtml}
             const savedProgress = a.progress
             const draftProgress = editing ? (activityProgress[a.activity_id] ?? a.progress) : a.progress
             return (
-              <div key={a.activity_id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
-                <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
-                {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
-                <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 16, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 99, width: `${savedProgress}%`, background: savedProgress === 100 ? '#4ade80' : savedProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
-                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: savedProgress > 45 ? '#fff' : '#374151' }}>{savedProgress}%</span>
+              <div key={a.activity_id} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', rowGap: 6 }}>
+                  <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
+                  {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
+                  <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 10, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', borderRadius: 99, width: `${savedProgress}%`, background: savedProgress === 100 ? '#4ade80' : savedProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
+                    {savedProgress >= 12 && (
+                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: savedProgress > 45 ? '#fff' : '#374151' }}>{savedProgress}%</span>
+                    )}
+                  </div>
+                  {editing ? (
+                    <input type="number" min={0} max={100} value={activityProgress[a.activity_id] ?? a.progress}
+                      onChange={e => setActivityProgress(prev => ({ ...prev, [a.activity_id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
+                      onFocus={e => e.target.select()}
+                      style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
+                  ) : (
+                    <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
+                  )}
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: savedProgress === 0 ? '#f3f4f6' : savedProgress < 100 ? '#dbeafe' : '#dcfce7', color: savedProgress === 0 ? '#6b7280' : savedProgress < 100 ? '#1e40af' : '#166534' }}>
+                    {savedProgress === 0 ? 'Not started' : savedProgress < 100 ? 'In progress' : 'Completed'}
+                  </span>
                 </div>
-                {editing ? (
-                  <input type="number" min={0} max={100} value={activityProgress[a.activity_id] ?? a.progress}
-                    onChange={e => setActivityProgress(prev => ({ ...prev, [a.activity_id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
-                    onFocus={e => e.target.select()}
-                    style={{ width: 55, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 6px', fontSize: 13, textAlign: 'center', fontWeight: 600 }} />
-                ) : (
-                  <span style={{ width: 38, textAlign: 'right', fontSize: 13, fontWeight: 600, color: MCORE_DARK }}>{a.progress}%</span>
-                )}
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, minWidth: 72, textAlign: 'center', background: savedProgress === 0 ? '#f3f4f6' : savedProgress < 100 ? '#dbeafe' : '#dcfce7', color: savedProgress === 0 ? '#6b7280' : savedProgress < 100 ? '#1e40af' : '#166534' }}>
-                  {savedProgress === 0 ? 'Not started' : savedProgress < 100 ? 'In progress' : 'Completed'}
-                </span>
                 {editing && draftProgress !== savedProgress && (
-                  <span style={{ fontSize: 10.5, color: ORANGE, fontWeight: 600 }}>→ will become {draftProgress}%</span>
+                  <div style={{ fontSize: 10.5, color: ORANGE, fontWeight: 600, marginTop: 3 }}>→ will become {draftProgress}% on save</div>
                 )}
               </div>
             )
@@ -1576,9 +1576,11 @@ ${photosHtml}
               <div key={ca.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap', rowGap: 6 }}>
                 <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{ca.name} <span style={{ color: BLUE, fontSize: 10 }}>(new)</span></span>
                 {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
-                <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 16, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 10, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
                   <div style={{ height: '100%', borderRadius: 99, width: `${draftProgress}%`, background: draftProgress === 100 ? '#4ade80' : draftProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
-                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: draftProgress > 45 ? '#fff' : '#374151' }}>{draftProgress}%</span>
+                  {draftProgress >= 12 && (
+                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: draftProgress > 45 ? '#fff' : '#374151' }}>{draftProgress}%</span>
+                  )}
                 </div>
                 <input type="number" min={0} max={100} value={draftProgress}
                   onChange={e => setActivityProgress(prev => ({ ...prev, [ca.id]: Math.min(100, Math.max(0, Number(e.target.value))) }))}
