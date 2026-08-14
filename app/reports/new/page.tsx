@@ -9,14 +9,14 @@ const BLUE = '#185FA5'
 const ORANGE = '#D46A28'
 
 const ACTIVITIES = [
-  { id: 1, name: 'Excavatii', weight: 5 },
-  { id: 2, name: 'Fundatii', weight: 15 },
-  { id: 3, name: 'Structura', weight: 15 },
-  { id: 4, name: 'Inchideri Perimetrale', weight: 10 },
-  { id: 5, name: 'Acoperis', weight: 10 },
-  { id: 6, name: 'Inst. Sanitare', weight: 15 },
-  { id: 7, name: 'Inst. Electrice', weight: 15 },
-  { id: 8, name: 'Sistematizare', weight: 15 },
+  { id: 1, name: 'Excavations', weight: 5 },
+  { id: 2, name: 'Foundations', weight: 15 },
+  { id: 3, name: 'Structure', weight: 15 },
+  { id: 4, name: 'Perimeter Closures', weight: 10 },
+  { id: 5, name: 'Roof', weight: 10 },
+  { id: 6, name: 'Sanitary Installations', weight: 15 },
+  { id: 7, name: 'Electrical Installations', weight: 15 },
+  { id: 8, name: 'Site Development', weight: 15 },
 ]
 
 function NewReportForm() {
