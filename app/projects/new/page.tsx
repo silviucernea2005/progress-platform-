@@ -185,7 +185,7 @@ export default function NewProjectPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 1, height: 22, background: 'rgba(255,255,255,0.15)' }} />
-          <button className="s7-btn" onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 13, padding: '6px 14px' }}>← Inapoi</button>
+          <button className="s7-btn" onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 13, padding: '6px 14px' }}>← Back</button>
         </div>
       </header>
       <main style={{ maxWidth: 600, margin: '0 auto', padding: '32px 24px' }}>
