@@ -1631,7 +1631,7 @@ ${photosHtml}
             <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Activities Progress</h2>
             <button onClick={() => setShowWeights(!showWeights)}
               style={{ fontSize: 11, color: '#6b7280', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>
-              {showWeights ? 'Ascunde ponderi' : 'Arata ponderi'}
+              {showWeights ? 'Hide weights' : 'Show weights'}
             </button>
           </div>
           {acts.map((a: any) => {
