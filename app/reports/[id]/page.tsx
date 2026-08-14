@@ -543,6 +543,25 @@ export default function ReportPage() {
 
   // Resize/compress images before storing — avoids blowing past the browser's localStorage
   // quota (~5-10MB) when someone drops several full-resolution site photos at once.
+  async function downloadPhoto(url: string, index: number) {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = `${(report?.project?.name || 'photo').replace(/[^a-z0-9]+/gi, '_')}_${report?.period_end || ''}_${index + 1}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objUrl)
+    } catch {
+      // Fallback: open in a new tab so the person can save it manually
+      window.open(url, '_blank')
+    }
+  }
+
   function compressImage(dataUrl: string, maxWidth = 1400, quality = 0.72): Promise<string> {
     return new Promise((resolve) => {
       const img = new Image()
@@ -1748,6 +1767,10 @@ ${photosHtml}
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 13, color: '#374151', padding: 8, textAlign: 'center' }}>{p.url?.replace('data:text/plain,', '')}</div>
                     )}
+                    {isImage && !deletePhotoMode && !rearrangeMode && (
+                      <button onClick={(e) => { e.stopPropagation(); downloadPhoto(p.url, i) }} title="Download"
+                        style={{ position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: 99, background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>⬇</button>
+                    )}
                     {deletePhotoMode && (
                       <div style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 99, background: isSelected ? '#dc2626' : 'rgba(255,255,255,0.85)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: '#fff' }}>
                         {isSelected ? '✓' : ''}
@@ -1856,6 +1879,8 @@ ${photosHtml}
         return (
           <div onClick={() => closeLightbox()} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'pan-y' }}>
+            <button onClick={(e) => { e.stopPropagation(); downloadPhoto(current.url, idx) }} title="Download"
+              style={{ position: 'absolute', top: 20, right: 76, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 40, height: 40, fontSize: 17, cursor: 'pointer' }}>⬇</button>
             <button onClick={(e) => { e.stopPropagation(); closeLightbox() }}
               style={{ position: 'absolute', top: 20, right: 24, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 40, height: 40, fontSize: 20, cursor: 'pointer' }}>×</button>
 
