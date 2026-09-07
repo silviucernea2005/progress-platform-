@@ -206,10 +206,25 @@ export default function DashboardPage() {
     return true
   })
 
+  // Same idea as getProjectResponsible: a project's weights can be customized (via
+  // Edit Project) and override each activity's global default_weight. Without this,
+  // the dashboard's percentages silently drift out of sync with the report page's
+  // percentages the moment weights are edited, because it was reading only the
+  // unchanging default_weight instead of the per-project override.
+  function getProjectWeights(p: any): Record<string, number> {
+    const settings = Array.isArray(p?.project_settings) ? p.project_settings[0] : p?.project_settings
+    return settings?.weights || {}
+  }
+  function weightFor(activityId: number, defaultWeight: number, customWeights: Record<string, number>): number {
+    return customWeights[activityId] !== undefined ? customWeights[activityId] : (defaultWeight || 0)
+  }
+
   function getProgress(projectId: string) {
     const rep = reports.find((r: any) => r.project_id === projectId)
     if (!rep || !rep.activities?.length) return null
-    return rep.activities.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
+    const project = projects.find((p: any) => p.id === projectId)
+    const customWeights = getProjectWeights(project)
+    return rep.activities.reduce((s: number, a: any) => s + a.progress * weightFor(a.activity_id, a.activity?.default_weight, customWeights) / 100, 0)
   }
 
   // Project-level "Responsible" (set via Manage Access) is the default shown everywhere.
@@ -227,7 +242,9 @@ export default function DashboardPage() {
 
   function getReportProgress(r: any) {
     const acts = r.activities || []
-    return acts.reduce((s: number, a: any) => s + a.progress * (a.activity?.default_weight || 0) / 100, 0)
+    const project = projects.find((p: any) => p.id === r.project_id)
+    const customWeights = getProjectWeights(project)
+    return acts.reduce((s: number, a: any) => s + a.progress * weightFor(a.activity_id, a.activity?.default_weight, customWeights) / 100, 0)
   }
 
   // Photos now live on the server — the reports list already includes them (see /api/reports)
@@ -601,6 +618,7 @@ export default function DashboardPage() {
     </div>
   )
 }
+
 
 
 
