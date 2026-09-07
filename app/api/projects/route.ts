@@ -20,7 +20,7 @@ async function requireAuth(req: NextRequest) {
 }
 
 export async function GET() {
-  const { data, error } = await supabase.from('projects').select('*, project_settings(responsible)').order('created_at', { ascending: false })
+  const { data, error } = await supabase.from('projects').select('*, project_settings(responsible, weights)').order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
 }
@@ -46,5 +46,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
