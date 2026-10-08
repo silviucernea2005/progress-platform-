@@ -544,6 +544,11 @@ export default function ReportPage() {
 
   // Resize/compress images before storing — avoids blowing past the browser's localStorage
   // quota (~5-10MB) when someone drops several full-resolution site photos at once.
+  // A category renamed for this project (Edit Project) shows under its new name everywhere.
+  function actName(a: any) {
+    return activityOverrides[a.activity_id]?.name || a.activity?.name
+  }
+
   async function downloadPhoto(url: string, index: number) {
     try {
       const res = await fetch(url)
@@ -900,7 +905,7 @@ export default function ReportPage() {
     const acts = (report.activities || []).map((a: any) => ({
       activity_id: a.activity_id,
       progress: a.progress,
-      name: a.activity?.name,
+      name: actName(a),
       weight: getWeight(a.activity_id, a.activity?.default_weight || 0)
     }))
     localStorage.setItem(`prefill_report_${report.project_id}`, JSON.stringify({ activities: acts, project_id: report.project_id, project_name: report.project?.name }))
@@ -1170,7 +1175,7 @@ export default function ReportPage() {
       const contribution = (a.progress * w / 100).toFixed(2)
       return `
         <tr style="border-bottom:1px solid #f0f0f0">
-          <td style="padding:8px 12px;font-size:13px">${a.activity?.name}</td>
+          <td style="padding:8px 12px;font-size:13px">${actName(a)}</td>
           <td style="padding:8px 12px;text-align:center;font-size:13px">${w}%</td>
           <td style="padding:8px 12px;text-align:center;font-size:13px;font-weight:600">${a.progress}%</td>
           <td style="padding:8px 12px;text-align:center;font-size:13px;color:#185FA5">${contribution}%</td>
@@ -1684,7 +1689,7 @@ ${photosHtml}
             return (
               <div key={a.activity_id} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', rowGap: 6 }}>
-                  <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{a.activity?.name}</span>
+                  <span style={{ flex: '1 1 140px', minWidth: 120, fontSize: 13, color: MCORE_DARK }}>{actName(a)}</span>
                   {showWeights && <span style={{ fontSize: 11, color: '#9ca3af', width: 28 }}>{w}%</span>}
                   <div style={{ position: 'relative', flex: '2 1 90px', minWidth: 60, height: 10, background: '#f3f4f6', borderRadius: 99, overflow: 'hidden' }}>
                     <div style={{ height: '100%', borderRadius: 99, width: `${savedProgress}%`, background: savedProgress === 100 ? '#4ade80' : savedProgress > 0 ? '#60a5fa' : '#e5e7eb', transition: 'width 0.3s' }} />
@@ -1951,6 +1956,7 @@ ${photosHtml}
     </div>
   )
 }
+
 
 
 
