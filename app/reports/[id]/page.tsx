@@ -105,6 +105,7 @@ export default function ReportPage() {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const touchStartX = useRef<number | null>(null)
+  const [downloadingAll, setDownloadingAll] = useState(false)
 
   const [tenderStart, setTenderStart] = useState('')
   const [tenderOffersReceived, setTenderOffersReceived] = useState('')
@@ -560,6 +561,44 @@ export default function ReportPage() {
       // Fallback: open in a new tab so the person can save it manually
       window.open(url, '_blank')
     }
+  }
+
+  // Bundles every image of the report into one ZIP (JSZip is already a dependency)
+  // so all photos download in a single click instead of one by one.
+  async function downloadAllPhotos() {
+    const imagePhotos = photos.filter(p => p.url && !p.url.startsWith('data:text/plain'))
+    if (!imagePhotos.length || downloadingAll) return
+    setDownloadingAll(true)
+    try {
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+      const base = `${(report?.project?.name || 'photos').replace(/[^a-z0-9]+/gi, '_')}_${report?.period_end || ''}`
+      let added = 0
+      for (let i = 0; i < imagePhotos.length; i++) {
+        try {
+          const res = await fetch(imagePhotos[i].url)
+          if (!res.ok) continue
+          const blob = await res.blob()
+          const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+          zip.file(`${base}_${String(i + 1).padStart(2, '0')}.${ext}`, blob)
+          added++
+        } catch {}
+      }
+      if (!added) { alert('Could not download the photos. Check your connection and try again.'); setDownloadingAll(false); return }
+      const content = await zip.generateAsync({ type: 'blob' })
+      const objUrl = URL.createObjectURL(content)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = `${base}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objUrl)
+      if (added < imagePhotos.length) alert(`Downloaded ${added} of ${imagePhotos.length} photos — ${imagePhotos.length - added} could not be fetched.`)
+    } catch {
+      alert('Could not create the ZIP file.')
+    }
+    setDownloadingAll(false)
   }
 
   function compressImage(dataUrl: string, maxWidth = 1400, quality = 0.72): Promise<string> {
@@ -1733,7 +1772,15 @@ ${photosHtml}
 
         {/* PHOTOS / ATTACHMENTS */}
         <div className="s7-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 20 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14, color: MCORE_DARK }}>Site Photos & Attachments</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+            <h2 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: MCORE_DARK }}>Site Photos & Attachments</h2>
+            {photos.some(p => p.url && !p.url.startsWith('data:text/plain')) && (
+              <button className="s7-btn" onClick={downloadAllPhotos} disabled={downloadingAll}
+                style={{ ...btn('#f3f4f6', '#374151'), fontSize: 12, padding: '6px 12px', opacity: downloadingAll ? 0.6 : 1 }}>
+                {downloadingAll ? 'Preparing ZIP…' : '⬇ Download all (ZIP)'}
+              </button>
+            )}
+          </div>
 
           {photos.length > 0 && (
             <div className="s7-photo-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
@@ -1904,6 +1951,7 @@ ${photosHtml}
     </div>
   )
 }
+
 
 
 
