@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { jwtVerify } from 'jose'
+import { syncProjectReportActivities } from '../../../lib/syncReportActivities'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -64,10 +65,13 @@ export async function POST(req: NextRequest) {
       sort_order: nextSortOrder,
     }).select().single()
     if (error) throw error
+    // Add the new category (0%) to every existing report of this project
+    try { await syncProjectReportActivities(supabase, body.project_id) } catch {}
     return NextResponse.json({ ok: true, activity: data })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
