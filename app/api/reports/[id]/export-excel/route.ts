@@ -60,11 +60,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (error || !report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
     const [{ data: settings }, { data: allReports }, { data: photoRows }] = await Promise.all([
-      supabase.from('project_settings').select('weights, responsible').eq('project_id', report.project_id).maybeSingle(),
+      supabase.from('project_settings').select('weights, responsible, activity_overrides').eq('project_id', report.project_id).maybeSingle(),
       supabase.from('reports').select('id').eq('project_id', report.project_id),
       supabase.from('report_photos').select('url').eq('report_id', params.id).order('created_at', { ascending: true }),
     ])
     const weights: Record<string, number> = settings?.weights || {}
+    const overrides: Record<string, { name?: string }> = settings?.activity_overrides || {}
+    const actName = (a: any) => overrides[a.activity_id]?.name || a.activity?.name || ''
     const getWeight = (activityId: number, defaultWeight: number) => weights[activityId] !== undefined ? weights[activityId] : defaultWeight
     const responsible: string = report.responsible || settings?.responsible || ''
 
@@ -124,7 +126,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const w = getWeight(a.activity_id, a.activity?.default_weight || 0)
       const contribution = (a.progress * w / 100)
       const st = statusOf(a.progress)
-      sheet.getCell(r, 1).value = a.activity?.name || ''
+      sheet.getCell(r, 1).value = actName(a)
       sheet.getCell(r, 2).value = w / 100
       sheet.getCell(r, 2).numFmt = '0%'
       sheet.getCell(r, 3).value = a.progress / 100
@@ -235,4 +237,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
