@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { jwtVerify } from 'jose'
+import { syncProjectReportActivities } from '../../../../../lib/syncReportActivities'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -55,11 +56,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
     const { error } = await supabase.from('project_settings').upsert(merged)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    // Hidden/restored/renamed categories and any pending additions: make all reports of the project match
+    if (body.activity_overrides !== undefined) {
+      try { await syncProjectReportActivities(supabase, params.id) } catch {}
+    }
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
 
