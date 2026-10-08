@@ -128,7 +128,7 @@ export default function EditProjectPage() {
 
   async function handleDeleteActivity(a: any) {
     if (a.project_id) {
-      if (!confirm(`Delete "${activityName(a)}"? This category was created only for this project.`)) return
+      if (!confirm(`Delete "${activityName(a)}"? This category was created only for this project. It will be removed from ALL of its reports, including any progress entered for it.`)) return
       try {
         await fetch(`/api/activities/${a.id}`, { method: 'DELETE' })
         setActivities(prev => prev.filter(x => x.id !== a.id))
@@ -136,7 +136,7 @@ export default function EditProjectPage() {
         alert('Could not delete the activity.')
       }
     } else {
-      if (!confirm(`Hide "${activityName(a)}" from this project? It stays available for other projects. You can bring it back later.`)) return
+      if (!confirm(`Hide "${activityName(a)}" from this project? It will be removed from ALL of this project's reports (including any progress entered for it) when you save. Other projects keep it. If you bring it back later it returns at 0%.`)) return
       setOverride(a.id, { excluded: true })
     }
   }
@@ -275,7 +275,7 @@ export default function EditProjectPage() {
             </span>
           </div>
           <p style={{ fontSize: 12, color: '#9ca3af', marginTop: -8, marginBottom: 16 }}>
-            Renaming or hiding a default category only affects this project — other projects keep it as-is. Custom categories created for this project only can be renamed or deleted for real.
+            Adding, renaming, hiding or deleting a category updates ALL reports of this project (past and future) when you save. Renaming or hiding a default category only affects this project — other projects keep it as-is.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
@@ -345,4 +345,5 @@ export default function EditProjectPage() {
     </div>
   )
 }
+
 
