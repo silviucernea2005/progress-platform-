@@ -61,6 +61,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!activity.project_id) return NextResponse.json({ error: 'Default activities are shared across projects and cannot be deleted — hide them for this project instead.' }, { status: 400 })
   if (!(await canEditProject(user, activity.project_id))) return NextResponse.json({ error: "You don't have edit rights on this project." }, { status: 403 })
   try {
+    // Remove this category from every report first (otherwise the foreign key can block the delete)
+    const { error: rowsErr } = await supabase.from('report_activities').delete().eq('activity_id', params.id)
+    if (rowsErr) throw rowsErr
     const { error } = await supabase.from('activities').delete().eq('id', params.id)
     if (error) throw error
     return NextResponse.json({ ok: true })
@@ -68,4 +71,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
