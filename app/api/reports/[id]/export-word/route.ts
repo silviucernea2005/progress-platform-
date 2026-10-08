@@ -64,11 +64,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (error || !report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
     const [{ data: settings }, { data: allReports }, { data: photoRows }] = await Promise.all([
-      supabase.from('project_settings').select('weights').eq('project_id', report.project_id).maybeSingle(),
+      supabase.from('project_settings').select('weights, activity_overrides').eq('project_id', report.project_id).maybeSingle(),
       supabase.from('reports').select('id').eq('project_id', report.project_id),
       supabase.from('report_photos').select('url').eq('report_id', params.id).order('created_at', { ascending: true }),
     ])
     const weights: Record<string, number> = settings?.weights || {}
+    const overrides: Record<string, { name?: string }> = settings?.activity_overrides || {}
+    const actName = (a: any) => overrides[a.activity_id]?.name || a.activity?.name || ''
     const getWeight = (activityId: number, defaultWeight: number) => weights[activityId] !== undefined ? weights[activityId] : defaultWeight
 
     const acts = (report.activities || []).sort((a: any, b: any) => (a.activity?.sort_order || 0) - (b.activity?.sort_order || 0))
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         const st = statusOf(a.progress)
         return new TableRow({
           children: [
-            cell(a.activity?.name || ''),
+            cell(actName(a)),
             cell(`${w}%`, { align: AlignmentType.CENTER }),
             cell(`${a.progress}%`, { align: AlignmentType.CENTER, bold: true }),
             cell(`${contribution}%`, { align: AlignmentType.CENTER, color: BLUE }),
@@ -203,6 +205,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
 
 
