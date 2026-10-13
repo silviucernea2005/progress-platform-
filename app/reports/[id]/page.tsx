@@ -105,6 +105,32 @@ export default function ReportPage() {
   const [showPhotoMenu, setShowPhotoMenu] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const touchStartX = useRef<number | null>(null)
+  // Photo viewer zoom: mouse wheel zooms toward the cursor, drag pans, double-click toggles.
+  const [zoom, setZoom] = useState({ scale: 1, x: 0, y: 0 })
+  const zoomRef = useRef({ scale: 1, x: 0, y: 0 })
+  const lightboxEl = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
+  const dragMoved = useRef(false)
+  const MAX_ZOOM = 8
+  function setZoomBoth(z: { scale: number; x: number; y: number }) { zoomRef.current = z; setZoom(z) }
+  function clampPan(scale: number, x: number, y: number) {
+    // keep the picture from being dragged completely out of view
+    const maxX = window.innerWidth * 0.45 * scale
+    const maxY = window.innerHeight * 0.44 * scale
+    return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) }
+  }
+  function zoomAt(factor: number, clientX?: number, clientY?: number) {
+    const { scale, x, y } = zoomRef.current
+    const next = Math.min(MAX_ZOOM, Math.max(1, scale * factor))
+    if (next === scale) return
+    if (next <= 1.001) { setZoomBoth({ scale: 1, x: 0, y: 0 }); return }
+    const cx = (clientX ?? window.innerWidth / 2) - window.innerWidth / 2
+    const cy = (clientY ?? window.innerHeight / 2) - window.innerHeight / 2
+    const k = next / scale
+    // keep the point under the cursor fixed while the scale changes
+    const pan = clampPan(next, cx - (cx - x) * k, cy - (cy - y) * k)
+    setZoomBoth({ scale: next, ...pan })
+  }
   const [downloadingAll, setDownloadingAll] = useState(false)
 
   const [tenderStart, setTenderStart] = useState('')
@@ -703,9 +729,29 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (lightboxIndex === null) return
+    const el = lightboxEl.current
+    if (!el) return
+    function onWheel(e: WheelEvent) {
+      e.preventDefault()
+      const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY
+      zoomAt(Math.exp(-dy * 0.0015), e.clientX, e.clientY)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxIndex !== null])
+
+  // every new photo (or reopening the viewer) starts at normal size
+  useEffect(() => { setZoomBoth({ scale: 1, x: 0, y: 0 }) }, [lightboxIndex])
+
+  useEffect(() => {
+    if (lightboxIndex === null) return
     const imagePhotos = photos.filter(p => p.url && !p.url.startsWith('data:text/plain'))
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') closeLightbox()
+      if (e.key === '+' || e.key === '=') zoomAt(1.3)
+      if (e.key === '-') zoomAt(1 / 1.3)
+      if (e.key === '0') setZoomBoth({ scale: 1, x: 0, y: 0 })
       if (e.key === 'ArrowRight') setLightboxIndex(i => i === null ? null : (i + 1) % imagePhotos.length)
       if (e.key === 'ArrowLeft') setLightboxIndex(i => i === null ? null : (i - 1 + imagePhotos.length) % imagePhotos.length)
     }
@@ -1917,7 +1963,7 @@ ${photosHtml}
         const current = imagePhotos[idx]
 
         function handleTouchStart(e: React.TouchEvent) {
-          touchStartX.current = e.touches[0].clientX
+          touchStartX.current = zoomRef.current.scale > 1.01 ? null : e.touches[0].clientX // no swipe-to-change while zoomed in
         }
         function handleTouchEnd(e: React.TouchEvent) {
           if (touchStartX.current === null) return
@@ -1929,7 +1975,18 @@ ${photosHtml}
         }
 
         return (
-          <div onClick={() => closeLightbox()} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+          <div ref={lightboxEl}
+            onClick={() => { if (dragMoved.current) { dragMoved.current = false; return } closeLightbox() }}
+            onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
+            onMouseMove={(e) => {
+              const d = dragRef.current
+              if (!d) return
+              const dx = e.clientX - d.sx, dy = e.clientY - d.sy
+              if (Math.abs(dx) + Math.abs(dy) > 3) dragMoved.current = true
+              setZoomBoth({ scale: zoomRef.current.scale, ...clampPan(zoomRef.current.scale, d.ox + dx, d.oy + dy) })
+            }}
+            onMouseUp={() => { dragRef.current = null }}
+            onMouseLeave={() => { dragRef.current = null }}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'pan-y' }}>
             <button onClick={(e) => { e.stopPropagation(); downloadPhoto(current.url, idx) }} title="Download"
               style={{ position: 'absolute', top: 20, right: 76, background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 40, height: 40, fontSize: 17, cursor: 'pointer' }}>⬇</button>
@@ -1941,15 +1998,29 @@ ${photosHtml}
                 style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 44, height: 44, fontSize: 22, cursor: 'pointer' }}>‹</button>
             )}
 
-            <img src={current.url} onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '90vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 6 }} />
+            <img src={current.url} draggable={false} onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => {
+                if (zoomRef.current.scale <= 1.01) return
+                e.preventDefault()
+                dragMoved.current = false
+                dragRef.current = { sx: e.clientX, sy: e.clientY, ox: zoomRef.current.x, oy: zoomRef.current.y }
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                if (zoomRef.current.scale > 1.01) setZoomBoth({ scale: 1, x: 0, y: 0 })
+                else zoomAt(2.5, e.clientX, e.clientY)
+              }}
+              style={{ maxWidth: '90vw', maxHeight: '88vh', objectFit: 'contain', borderRadius: 6, userSelect: 'none',
+                transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})`,
+                cursor: zoom.scale > 1.01 ? 'grab' : 'zoom-in',
+                transition: dragRef.current ? 'none' : 'transform 0.08s ease-out' }} />
 
             {imagePhotos.length > 1 && (
               <button onClick={(e) => { e.stopPropagation(); setLightboxIndex((idx + 1) % imagePhotos.length) }}
                 style={{ position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 99, width: 44, height: 44, fontSize: 22, cursor: 'pointer' }}>›</button>
             )}
 
-            <div style={{ position: 'absolute', bottom: 20, color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>{idx + 1} / {imagePhotos.length}</div>
+            <div style={{ position: 'absolute', bottom: 20, color: 'rgba(255,255,255,0.6)', fontSize: 13, textAlign: 'center' }}>{idx + 1} / {imagePhotos.length}<div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{zoom.scale > 1.01 ? `${Math.round(zoom.scale * 100)}% · drag to move · double-click to reset` : 'scroll to zoom'}</div></div>
           </div>
         )
       })()}
