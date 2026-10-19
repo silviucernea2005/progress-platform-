@@ -28,6 +28,9 @@ function NewReportForm() {
   const [projectId, setProjectId] = useState(searchParams.get('project') || '')
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
+  // End date of this project's most recent report — suggested as the new report's start
+  const [prevEnd, setPrevEnd] = useState('')
+  const autoStart = useRef('')
   const [worksDone, setWorksDone] = useState('')
   const [worksPlanned, setWorksPlanned] = useState('')
   const [redFlags, setRedFlags] = useState('')
@@ -253,6 +256,19 @@ function NewReportForm() {
       const w = settings?.weights || {}
       const overrides = settings?.activity_overrides || {}
       const latest = Array.isArray(reportsList) && reportsList.length ? reportsList[0] : null
+      // Previous report's end date (latest by end date, so it doesn't depend on list order)
+      const prev = Array.isArray(reportsList)
+        ? reportsList.map((r: any) => r.period_end).filter(Boolean).sort().pop() || ''
+        : ''
+      setPrevEnd(prev)
+      // Prefill the start with it — but never overwrite something the person typed
+      // (or an Excel import filled in); only replace an earlier auto-filled value.
+      const oldAuto = autoStart.current // captured now: React may run the updater below after the ref changes
+      setPeriodStart(cur => {
+        if (!prev) return cur === oldAuto ? '' : cur
+        return (cur === '' || cur === oldAuto) ? prev : cur
+      })
+      autoStart.current = prev
       setActivities(
         acts
           .filter((a: any) => !overrides[a.id]?.excluded)
@@ -360,7 +376,19 @@ function NewReportForm() {
             </select>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div><label style={lbl}>Period start</label><input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inp} /></div>
+            <div>
+              <label style={lbl}>Period start</label>
+              <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={inp} />
+              {prevEnd && (
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                  Previous report ended on <strong style={{ color: '#6b7280' }}>{prevEnd}</strong>
+                  {periodStart !== prevEnd && (
+                    <button type="button" onClick={() => setPeriodStart(prevEnd)}
+                      style={{ marginLeft: 6, background: 'none', border: 'none', color: BLUE, cursor: 'pointer', fontSize: 11, padding: 0 }}>use it</button>
+                  )}
+                </div>
+              )}
+            </div>
             <div><label style={lbl}>Period end</label><input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inp} /></div>
           </div>
         </div>
@@ -470,6 +498,7 @@ export default function NewReportPage() {
     </Suspense>
   )
 }
+
 
 
 
