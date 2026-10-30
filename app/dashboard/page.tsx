@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [selectedProject, setSelectedProject] = useState<string>('all')
   const [filterResponsible, setFilterResponsible] = useState<string>('all')
   const [filterClient, setFilterClient] = useState<string>('all')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'completed'>('all')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showAccessPanel, setShowAccessPanel] = useState(false)
@@ -186,6 +187,12 @@ export default function DashboardPage() {
     setSelectedProject(id)
     setFilterResponsible('all')
     setFilterClient('all')
+    // keep the status view unless the chosen project isn't part of it
+    if (id !== 'all' && filterStatus !== 'all' && projectStatus(id) !== filterStatus) setFilterStatus('all')
+  }
+  function chooseStatus(value: 'all' | 'ongoing' | 'completed') {
+    setFilterStatus(value)
+    if (selectedProject !== 'all' && value !== 'all' && projectStatus(selectedProject) !== value) setSelectedProject('all')
   }
   function setResponsibleFilter(value: string) {
     setFilterResponsible(value)
@@ -198,6 +205,7 @@ export default function DashboardPage() {
 
   const filteredReports = reports.filter((r: any) => {
     if (selectedProject !== 'all' && r.project_id !== selectedProject) return false
+    if (filterStatus !== 'all' && projectStatus(r.project_id) !== filterStatus) return false
     if (filterResponsible !== 'all' || filterClient !== 'all') {
       const proj = projects.find((p: any) => p.id === r.project_id)
       if (filterResponsible !== 'all' && getProjectResponsible(proj) !== filterResponsible) return false
@@ -217,6 +225,17 @@ export default function DashboardPage() {
   }
   function weightFor(activityId: number, defaultWeight: number, customWeights: Record<string, number>): number {
     return customWeights[activityId] !== undefined ? customWeights[activityId] : (defaultWeight || 0)
+  }
+
+  // A project is "completed" when its latest report reaches 100% (as displayed, i.e. rounded
+  // to 1 decimal). Derived automatically — if later reports drop below 100% (e.g. a new
+  // category is added), it goes back to "ongoing" by itself. No manual status to maintain.
+  function isProjectCompleted(projectId: string): boolean {
+    const prog = getProgress(projectId)
+    return prog !== null && Math.round(prog * 10) / 10 >= 100
+  }
+  function projectStatus(projectId: string): 'ongoing' | 'completed' {
+    return isProjectCompleted(projectId) ? 'completed' : 'ongoing'
   }
 
   function getProgress(projectId: string) {
@@ -327,6 +346,31 @@ export default function DashboardPage() {
             </select>
           </div>
 
+          {!loading && projects.length > 0 && (() => {
+            const completedCount = projects.filter((p: any) => isProjectCompleted(p.id)).length
+            const tabs: { key: 'all' | 'ongoing' | 'completed'; label: string; count: number; color: string }[] = [
+              { key: 'all', label: 'All', count: projects.length, color: MCORE_DARK },
+              { key: 'ongoing', label: 'Ongoing', count: projects.length - completedCount, color: ORANGE },
+              { key: 'completed', label: 'Completed', count: completedCount, color: GREEN },
+            ]
+            return (
+              <div style={{ padding: '0 12px 12px' }}>
+                <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 8, padding: 2, gap: 2 }}>
+                  {tabs.map(t => {
+                    const active = filterStatus === t.key
+                    return (
+                      <button key={t.key} onClick={() => chooseStatus(t.key)}
+                        style={{ flex: 1, border: 'none', borderRadius: 6, padding: '5px 2px', fontSize: 10.5, cursor: 'pointer', fontWeight: active ? 700 : 500,
+                          background: active ? '#fff' : 'transparent', color: active ? t.color : '#6b7280', boxShadow: active ? '0 1px 2px rgba(0,0,0,0.08)' : 'none' }}>
+                        {t.label} <span style={{ opacity: 0.7 }}>{t.count}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="s7-dash-projectlist">
           <div onClick={() => selectProject('all')}
             style={{ padding: '9px 16px', cursor: 'pointer', fontSize: 13, fontWeight: selectedProject === 'all' ? 600 : 400, color: selectedProject === 'all' ? MCORE_DARK : '#374151', background: selectedProject === 'all' ? '#f5f5f3' : 'transparent', borderLeft: selectedProject === 'all' ? `3px solid ${MCORE_DARK}` : '3px solid transparent' }}>
@@ -339,16 +383,18 @@ export default function DashboardPage() {
             </div>
           )
             : projects
-              .filter((p: any) => (filterResponsible === 'all' || getProjectResponsible(p) === filterResponsible) && (filterClient === 'all' || p.client === filterClient))
+              .filter((p: any) => (filterResponsible === 'all' || getProjectResponsible(p) === filterResponsible) && (filterClient === 'all' || p.client === filterClient) && (filterStatus === 'all' || projectStatus(p.id) === filterStatus))
               .map(p => {
               const prog = getProgress(p.id)
               const isSelected = selectedProject === p.id
+              const done = isProjectCompleted(p.id)
+              const accent = done ? GREEN : ORANGE
               const canDelete = currentUser && (currentUser.role === 'admin' || p.created_by === currentUser.id)
               return (
                 <div key={p.id} onClick={() => selectProject(p.id)}
-                  style={{ padding: '10px 16px', cursor: 'pointer', borderLeft: isSelected ? `3px solid ${ORANGE}` : '3px solid transparent', background: isSelected ? '#fef9f5' : 'transparent', position: 'relative' }}>
+                  style={{ padding: '10px 16px', cursor: 'pointer', borderLeft: isSelected ? `3px solid ${accent}` : (done ? '3px solid #bfe3c5' : '3px solid transparent'), background: isSelected ? (done ? '#f0f9f1' : '#fef9f5') : (done ? '#f7fbf7' : 'transparent'), position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 400, color: isSelected ? ORANGE : '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                    <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 400, color: isSelected ? accent : (done ? '#2f7d3b' : '#374151'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{done ? '✓ ' : ''}{p.name}</div>
                     {canDelete && (
                       <button onClick={async (e) => {
                         e.stopPropagation()
@@ -363,9 +409,9 @@ export default function DashboardPage() {
                   {prog !== null && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
                       <div style={{ flex: 1, height: 3, background: '#f3f4f6', borderRadius: 99 }}>
-                        <div className="s7-progress-fill" style={{ height: '100%', background: ORANGE, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
+                        <div className="s7-progress-fill" style={{ height: '100%', background: accent, borderRadius: 99, width: `${Math.min(prog, 100)}%` }} />
                       </div>
-                      <span style={{ fontSize: 10, color: '#9ca3af' }}>{prog.toFixed(0)}%</span>
+                      <span style={{ fontSize: 10, color: done ? '#2f7d3b' : '#9ca3af', fontWeight: done ? 700 : 400 }}>{done ? 'Completed' : `${prog.toFixed(0)}%`}</span>
                     </div>
                   )}
                   {p.location && <div style={{ fontSize: 10, color: '#d1d5db', marginTop: 1 }}>{p.location}</div>}
@@ -381,11 +427,14 @@ export default function DashboardPage() {
           {/* KPIs */}
           <div className="s7-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
             {[
-              { label: 'Active Projects', value: loading ? '—' : projects.filter(p => p.status === 'active').length, color: BLUE_DARK },
-              { label: 'Total Reports', value: loading ? '—' : filteredReports.length, color: '#374151' },
-              { label: 'Completed Projects', value: loading ? '—' : projects.filter(p => p.status === 'completed').length, color: '#3B6D11' },
+              { label: 'Ongoing Projects', value: loading ? '—' : projects.filter(p => !isProjectCompleted(p.id)).length, color: BLUE_DARK, status: 'ongoing' as const },
+              { label: 'Total Reports', value: loading ? '—' : filteredReports.length, color: '#374151', status: null },
+              { label: 'Completed Projects', value: loading ? '—' : projects.filter(p => isProjectCompleted(p.id)).length, color: '#3B6D11', status: 'completed' as const },
             ].map(k => (
-              <div key={k.label} className="s7-card s7-kpi-card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: '16px 20px' }}>
+              <div key={k.label} className="s7-card s7-kpi-card"
+                onClick={k.status ? () => chooseStatus(filterStatus === k.status ? 'all' : k.status!) : undefined}
+                title={k.status ? 'Click to filter the project list' : undefined}
+                style={{ background: '#fff', borderRadius: 12, border: k.status && filterStatus === k.status ? `2px solid ${k.color}` : '1px solid #e5e7eb', padding: '16px 20px', cursor: k.status ? 'pointer' : 'default' }}>
                 <div className="s7-kpi-value" style={{ fontSize: 28, fontWeight: 700, color: k.color }}>{k.value}</div>
                 <div className="s7-kpi-label" style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>{k.label}</div>
               </div>
@@ -396,9 +445,9 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: MCORE_DARK, margin: 0 }}>
               {selectedProject === 'all' ? 'All Reports' : `Reports — ${projects.find(p => p.id === selectedProject)?.name || ''}`}
-              {(filterResponsible !== 'all' || filterClient !== 'all') && (
+              {(filterResponsible !== 'all' || filterClient !== 'all' || filterStatus !== 'all') && (
                 <span style={{ fontSize: 13, fontWeight: 400, color: '#9ca3af' }}>
-                  {' '}({[filterResponsible !== 'all' ? filterResponsible : null, filterClient !== 'all' ? filterClient : null].filter(Boolean).join(' · ')})
+                  {' '}({[filterResponsible !== 'all' ? filterResponsible : null, filterClient !== 'all' ? filterClient : null, filterStatus !== 'all' ? (filterStatus === 'ongoing' ? 'Ongoing' : 'Completed') : null].filter(Boolean).join(' · ')})
                 </span>
               )}
             </h2>
@@ -419,8 +468,8 @@ export default function DashboardPage() {
                       <option key={client} value={client}>{client}</option>
                     ))}
                   </select>
-                  {(filterResponsible !== 'all' || filterClient !== 'all') && (
-                    <button onClick={() => { setFilterResponsible('all'); setFilterClient('all') }}
+                  {(filterResponsible !== 'all' || filterClient !== 'all' || filterStatus !== 'all') && (
+                    <button onClick={() => { setFilterResponsible('all'); setFilterClient('all'); setFilterStatus('all') }}
                       style={{ fontSize: 12, color: BLUE, background: 'none', border: 'none', cursor: 'pointer' }}>✕ Clear</button>
                   )}
                 </>
@@ -618,6 +667,7 @@ export default function DashboardPage() {
     </div>
   )
 }
+
 
 
 
