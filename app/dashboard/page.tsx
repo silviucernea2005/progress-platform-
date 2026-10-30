@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [filterResponsible, setFilterResponsible] = useState<string>('all')
   const [filterClient, setFilterClient] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'completed'>('all')
+  const [exportingAll, setExportingAll] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showAccessPanel, setShowAccessPanel] = useState(false)
@@ -47,6 +48,30 @@ export default function DashboardPage() {
   const [activityLog, setActivityLog] = useState<any[]>([])
   const [loadingLog, setLoadingLog] = useState(false)
   const [anonVisits, setAnonVisits] = useState<any[]>([])
+
+  // Admin-only: downloads the whole platform as one Excel workbook with live formulas.
+  async function exportAllExcel() {
+    if (exportingAll) return
+    setExportingAll(true)
+    try {
+      const res = await fetch('/api/export-all-excel')
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        alert(e.error || 'Could not create the Excel file.')
+      } else {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Progress_Platform_Excel_${new Date().toISOString().slice(0, 10)}.xlsx`
+        document.body.appendChild(a); a.click(); a.remove()
+        URL.revokeObjectURL(url)
+      }
+    } catch {
+      alert('Network error creating the Excel file.')
+    }
+    setExportingAll(false)
+  }
 
   async function openActivityLog() {
     setShowActivityLog(true)
@@ -308,6 +333,9 @@ export default function DashboardPage() {
             )}
             {currentUser?.role === 'admin' && (
               <button className="s7-btn" onClick={openActivityLog} style={btn('#5C6AC4')}>📋 Activity Log</button>
+            )}
+            {currentUser?.role === 'admin' && (
+              <button className="s7-btn" onClick={exportAllExcel} disabled={exportingAll} title="Download everything as one Excel workbook with live formulas" style={{ ...btn('#0D9488'), opacity: exportingAll ? 0.6 : 1 }}>{exportingAll ? 'Preparing…' : '📥 Excel'}</button>
             )}
           </div>
           <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)' }} />
