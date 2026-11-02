@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { ChartSpec, ref } from './excelCharts'
 
 // Builds a standalone Excel version of the platform: one sheet per project with the
 // weekly progress laid out as a table and the same calculations the platform does
@@ -43,9 +44,11 @@ export function buildExcelBackup(input: BackupInput) {
 
   const projects = [...input.projects].sort((a, b) => a.name.localeCompare(b.name))
   const skipped: string[] = []
+  const charts: ChartSpec[] = []
+  let chartedProjects = 0
 
   // ---------- unique, Excel-safe sheet names ----------
-  const used = new Set<string>(['README', 'Dashboard', 'Projects'])
+  const used = new Set<string>(['README', 'Dashboard', 'Charts', 'Projects'])
   const sheetNames = new Map<string, string>()
   for (const p of projects) {
     let base = p.name.replace(/[\[\]:*?\/\\]/g, '-').trim().slice(0, 28) || 'Project'
@@ -57,6 +60,7 @@ export function buildExcelBackup(input: BackupInput) {
 
   const readme = wb.addWorksheet('README', { views: [{ showGridLines: false }] })
   const dash = wb.addWorksheet('Dashboard', { views: [{ showGridLines: false }] })
+  const chartsWs = wb.addWorksheet('Charts', { views: [{ showGridLines: false }] })
   const master = wb.addWorksheet('Projects')
 
   // ---------- Projects (master data: names, client, responsible, ALL dates) ----------
@@ -201,6 +205,59 @@ export function buildExcelBackup(input: BackupInput) {
     ws.addConditionalFormatting({ ref: 'F3', rules: [
       { type: 'cellIs', operator: 'equal', formulae: ['"Completed"'], priority: 3, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } } } },
     ] })
+
+    // ----- chart data: helper columns that feed the charts on the "Charts" sheet -----
+    // Empty rows: the VALUE columns give #N/A on purpose (Excel skips #N/A points), while the DATE
+    // column just repeats the last date, so the X axis never contains an error. The cells are
+    // formatted white-on-white when unused so the sheet stays clean. Do not edit these columns.
+    const cData = cResp + 2
+    const [Ld, Lc, Lw, Lpx, Lpy, Ltx, Lty] = [0, 1, 2, 3, 4, 5, 6].map(k => L(cData + k))
+    ;['Chart data: date', 'Chart data: cumulated %', 'Chart data: weekly %', 'Plan: date', 'Plan: %', 'Trend: date', 'Trend: %'].forEach((h, k) => {
+      const c = ws.getCell(6, cData + k); c.value = h
+      c.font = { size: 9, color: { argb: 'FF9CA3AF' } }; c.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' }
+      ws.getColumn(cData + k).width = 12
+    })
+    ws.getCell(5, cData).value = 'Feeds the Charts sheet — formulas, do not edit'
+    ws.getCell(5, cData).font = { size: 9, italic: true, color: { argb: 'FF9CA3AF' } }
+    for (let r = FIRST_ROW; r <= LAST_ROW; r++) {
+      const d = ws.getCell(r, cData)
+      d.value = { formula: r === FIRST_ROW ? `IF($B${r}="",0,$B${r})` : `IF($B${r}="",${Ld}${r - 1},$B${r})` } as any; d.numFmt = 'yyyy-mm-dd'
+      ws.getCell(r, cData + 1).value = { formula: `IF($B${r}="",NA(),${W}${r})` } as any
+      ws.getCell(r, cData + 2).value = { formula: `IF($B${r}="",NA(),${L(cWeekly)}${r})` } as any
+      ;[cData, cData + 1, cData + 2].forEach(col => { ws.getCell(r, col).font = { size: 9, color: { argb: 'FF9CA3AF' } } })
+    }
+    const noPlan = 'OR($C$3="",$D$3="")', noTrend = 'OR($G$3="",$I$3="",$E$3="")'
+    const mini: [number, string, string][] = [
+      [cData + 3, `IF(${noPlan},$B$7,$C$3)`, `IF(${noPlan},$B$7,$D$3)`],
+      [cData + 4, `IF(${noPlan},NA(),0)`, `IF(${noPlan},NA(),100)`],
+      [cData + 5, `IF(${noTrend},$B$7,$G$3)`, `IF(${noTrend},$B$7,$I$3)`],
+      [cData + 6, `IF(${noTrend},NA(),$E$3)`, `IF(${noTrend},NA(),100)`],
+    ]
+    mini.forEach(([col, f1, f2], k) => {
+      for (const [row, f] of [[FIRST_ROW, f1], [FIRST_ROW + 1, f2]] as [number, string][]) {
+        const c = ws.getCell(row, col); c.value = { formula: f } as any; c.font = { size: 9, color: { argb: 'FF9CA3AF' } }
+        if (k === 0 || k === 2) c.numFmt = 'yyyy-mm-dd'
+      }
+    })
+    ws.addConditionalFormatting({ ref: `${Ld}${FIRST_ROW}:${Lty}${LAST_ROW}`, rules: [
+      { type: 'expression', formulae: [`OR(ISNA(${Ld}${FIRST_ROW}),$B${FIRST_ROW}="")`], priority: 4, style: { font: { color: { argb: 'FFFFFFFF' } } } },
+    ] })
+
+    if (rows.length > 0) {
+      const i = chartedProjects++
+      const rng = (col: string, r1 = FIRST_ROW, r2 = LAST_ROW) => ref(sheetName, `$${col}$${r1}:$${col}$${r2}`)
+      const col0 = (i % 2) * 11, row0 = 25 + Math.floor(i / 2) * 22
+      charts.push({
+        kind: 'scatter', sheet: 'Charts', title: `Works Progress — ${p.name}`, yMin: 0, yMax: 100, yTitle: '%',
+        from: { col: col0, row: row0 }, to: { col: col0 + 10, row: row0 + 21 },
+        series: [
+          { name: 'Cumulated progress', x: rng(Ld), y: rng(Lc), color: 'D46A28', widthPt: 2.5, marker: true },
+          { name: 'Actual (weekly) progress', x: rng(Ld), y: rng(Lw), color: '185FA5', widthPt: 1.5 },
+          { name: 'Trend', x: rng(Ltx, FIRST_ROW, FIRST_ROW + 1), y: rng(Lty, FIRST_ROW, FIRST_ROW + 1), color: '059669', widthPt: 2, dash: 'dash' },
+          { name: 'Contract plan', x: rng(Lpx, FIRST_ROW, FIRST_ROW + 1), y: rng(Lpy, FIRST_ROW, FIRST_ROW + 1), color: '888780', widthPt: 1.5, dash: 'sysDot' },
+        ],
+      })
+    }
   })
 
   // ---------- Dashboard (all projects, all formulas pointing at the project sheets) ----------
@@ -238,6 +295,20 @@ export function buildExcelBackup(input: BackupInput) {
     { type: 'cellIs', operator: 'equal', formulae: ['"Completed"'], priority: 1, style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFDCFCE7' } } } },
   ] })
 
+  // ---------- Charts sheet ----------
+  chartsWs.getCell('A1').value = 'Charts'
+  chartsWs.getCell('A1').font = { bold: true, size: 16 }
+  chartsWs.getCell('A2').value = 'These are real Excel charts. They update by themselves when you add a week to a project sheet (they read the grey "chart data" columns on the far right of each project sheet — leave those alone).'
+  chartsWs.getCell('A2').font = { size: 10, color: { argb: 'FF6B7280' } }
+  if (projects.length > 0) {
+    const lastD = D_FIRST + projects.length - 1
+    charts.unshift({
+      kind: 'column', sheet: 'Charts', title: 'Latest progress by project (%)', seriesName: 'Latest progress %', color: 'D46A28', yMin: 0, yMax: 100,
+      categories: ref('Dashboard', `$A$${D_FIRST}:$A$${lastD}`), values: ref('Dashboard', `$D$${D_FIRST}:$D$${lastD}`),
+      from: { col: 0, row: 3 }, to: { col: 11, row: 23 },
+    })
+  }
+
   // ---------- README ----------
   const lines: [string, boolean][] = [
     ['Progress Platform — Excel version', true],
@@ -246,7 +317,8 @@ export function buildExcelBackup(input: BackupInput) {
     ['What is in this workbook', true],
     ['• Dashboard — every project on one page (progress, status, delay status, trend finish, days remaining). Click a project name to jump to its sheet.', false],
     ['• Projects — project details and ALL project dates (yellow cells = inputs). Contract start/finish here drive the "contract plan" line and the delay status.', false],
-    ['• One sheet per project — weights row (yellow), one row per weekly report, one column per category, then the calculated columns.', false],
+    ['• Charts — a bar chart of every project\'s progress, plus one "Works Progress" chart per project (cumulated and weekly progress, trend, contract plan). They are real Excel charts and update on their own.', false],
+    ['• One sheet per project — weights row (yellow), one row per weekly report, one column per category, then the calculated columns. The light-grey columns on the far right feed the charts: leave them alone.', false],
     ['', false],
     ['How to keep using it in Excel', true],
     ['• New weekly report: on the project sheet, go to the first empty row, type Period start / Period end, then the progress % (0–100) of each category. All formulas are already filled in down to row 300.', false],
@@ -262,7 +334,7 @@ export function buildExcelBackup(input: BackupInput) {
     ['• Status: Completed when the latest weighted progress rounds to 100.0%, otherwise Ongoing.', false],
     ['', false],
     ['Not included (these need the platform)', true],
-    ['• Photos and attachments, user accounts / permissions, the activity log, and the interactive chart. To chart a project in Excel: select its Period end column and the Weighted progress % column, then Insert → Chart.', false],
+    ['• Photos and attachments, user accounts / permissions, the activity log, and the hover/zoom/expand features of the platform\'s chart.', false],
   ]
   if (skipped.length) {
     lines.push(['', false], ['Reports left out because their dates were invalid', true], ...skipped.map(s => [`• ${s}`, false] as [string, boolean]))
@@ -274,6 +346,6 @@ export function buildExcelBackup(input: BackupInput) {
     c.alignment = { wrapText: true, vertical: 'top' }
   })
 
-  return { wb, skipped }
+  return { wb, skipped, charts }
 }
 
