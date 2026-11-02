@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { jwtVerify } from 'jose'
 import { buildExcelBackup } from '../../../lib/buildExcelBackup'
+import { injectCharts } from '../../../lib/excelCharts'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,10 +41,11 @@ export async function GET(req: NextRequest) {
       ...p,
       settings: Array.isArray(p.project_settings) ? p.project_settings[0] || null : p.project_settings || null,
     }))
-    const { wb } = buildExcelBackup({ projects, activities: activitiesRes.data || [], reports: (reportsRes.data || []) as any })
-    const buffer = await wb.xlsx.writeBuffer()
+    const { wb, charts } = buildExcelBackup({ projects, activities: activitiesRes.data || [], reports: (reportsRes.data || []) as any })
+    // ExcelJS can't draw charts, so the native Excel charts are added to the finished file
+    const buffer = await injectCharts(await wb.xlsx.writeBuffer() as ArrayBuffer, charts)
     const day = new Date().toISOString().slice(0, 10)
-    return new NextResponse(new Uint8Array(buffer as ArrayBuffer), {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="Progress_Platform_Excel_${day}.xlsx"`,
