@@ -502,6 +502,9 @@ export default function DashboardPage() {
                   )}
                 </>
               )}
+              {currentUser && selectedProject !== 'all' && (
+                <Link className="s7-btn" href={`/projects/${selectedProject}/photos`} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>📷 Project photos</Link>
+              )}
               {currentUser?.role === 'admin' && selectedProject !== 'all' && (
                 <button className="s7-btn" onClick={openAccessPanel} style={{ ...btn('#f3f4f6', '#374151'), fontWeight: 600 }}>👥 Manage Access</button>
               )}
