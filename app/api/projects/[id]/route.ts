@@ -66,6 +66,12 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (!allowed) return NextResponse.json({ error: "Only the project's creator or an admin can delete this project." }, { status: 403 })
   try {
     const { data: existing } = await supabase.from('projects').select('name').eq('id', params.id).maybeSingle()
+    // the project_photos rows disappear with the project (cascade) but their files would stay in Storage
+    try {
+      const { data: files } = await supabase.from('project_photos').select('storage_path').eq('project_id', params.id)
+      const paths = (files || []).map((r: any) => r.storage_path).filter(Boolean)
+      if (paths.length) await supabase.storage.from('report-photos').remove(paths)
+    } catch {}
     const { error } = await supabase.from('projects').delete().eq('id', params.id)
     if (error) throw error
     try {
@@ -76,4 +82,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
 
