@@ -67,6 +67,9 @@ export default function ProjectPhotosPage() {
 
   // The selected day drives everything: the folder(s) shown on top, and where new photos go.
   const [selectedDate, setSelectedDate] = useState(todayLocal())
+  // Where new photos go. By default: the folder that already exists for the selected day.
+  // Only when asked ('new') is a separate folder created — and then folderName is its name.
+  const [targetChoice, setTargetChoice] = useState<{ date: string; key: string } | null>(null)
   const [folderName, setFolderName] = useState('')
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -126,6 +129,16 @@ export default function ProjectPhotosPage() {
   }, [photos])
 
 
+  const latestIn = (f: Folder) => f.photos.reduce((m, p) => ((p.created_at || '') > m ? (p.created_at || '') : m), '')
+  const dayFoldersAll = folders.filter(f => f.date === selectedDate)
+  const defaultTarget = dayFoldersAll.length ? [...dayFoldersAll].sort((a, b) => latestIn(b).localeCompare(latestIn(a)))[0] : null   // the folder used most recently that day
+  const effTargetKey: string =
+    targetChoice && targetChoice.date === selectedDate && (targetChoice.key === 'new' || dayFoldersAll.some(f => f.key === targetChoice.key))
+      ? targetChoice.key
+      : (defaultTarget?.key ?? 'new')
+  const targetFolder = effTargetKey === 'new' ? null : (dayFoldersAll.find(f => f.key === effTargetKey) || null)
+  const destination = targetFolder ? { date: targetFolder.date, name: targetFolder.name } : { date: selectedDate, name: cleanName(folderName) }
+
   // ---------------- upload: choose photos -> press Save -> verified against the server ----------------
   const makePreview = (f: File) => { try { return URL.createObjectURL(f) } catch { return '' } }
   const dropPreview = (u: string) => { try { if (u) URL.revokeObjectURL(u) } catch {} }
@@ -149,7 +162,13 @@ export default function ProjectPhotosPage() {
   async function savePending() {
     if (!isAdmin || uploading || !pending.length) return
     if (!saneDate(selectedDate)) { alert('Pick a valid date (year 2000–2100).'); return }
-    const date = selectedDate, name = cleanName(folderName), label = folderLabel({ date, name })
+    if (!targetFolder && dayFoldersAll.some(f => f.name === destination.name)) {
+      alert(destination.name
+        ? `A folder named "${destination.name}" already exists for ${selectedDate}. Choose it in the "Save into" list, or type a different name for the new folder.`
+        : `This day already has a folder without a name. Choose it in the "Save into" list, or give the new folder a name.`)
+      return
+    }
+    const date = destination.date, name = destination.name, label = folderLabel({ date, name })
     const batch = pending
     const failed: { p: Pending; msg: string }[] = []
     const savedIds: string[] = []
@@ -200,6 +219,9 @@ export default function ProjectPhotosPage() {
     } else {
       setNotice({ kind: 'ok', text: `✓ Saved: ${plural(confirmed)} in folder "${label}".${inFolder !== null ? ` The folder now has ${plural(inFolder)}.` : ''}` })
     }
+    // next photos continue in the folder that now exists, instead of making another one
+    setTargetChoice(null)
+    setFolderName('')
   }
 
   // ---------------- folder / photo actions (admin) ----------------
@@ -209,6 +231,8 @@ export default function ProjectPhotosPage() {
     if (!f) { setEditing(null); return }
     if (!saneDate(editing.date)) { alert('Pick a valid folder date (year 2000–2100).'); return }
     const name = cleanName(editing.name)
+    const clash = folders.find(x => x.key !== f.key && x.date === editing!.date && x.name === name)
+    if (clash && !confirm(`A folder "${folderLabel({ date: editing.date, name })}" already exists (${clash.photos.length} photo${clash.photos.length === 1 ? '' : 's'}). Merge these ${f.photos.length} photo${f.photos.length === 1 ? '' : 's'} into it?`)) return
     setBusyKey(f.key)
     try {
       const res = await fetch(`/api/projects/${projectId}/photos`, {
@@ -219,7 +243,8 @@ export default function ProjectPhotosPage() {
       if (!res.ok) throw new Error(data.error || `error ${res.status}`)
       const ids = new Set(f.photos.map(p => p.id))
       setPhotos(prev => prev.map(p => ids.has(p.id) ? { ...p, folder_date: editing.date, folder_name: name } : p))
-      setOpen(o => { const { [f.key]: wasOpen, ...rest } = o; return { ...rest, [`${editing.date}|${name}`]: wasOpen ?? true } })
+      // carry over only an explicit open/closed choice made by the user; never force a folder open
+      setOpen(o => { const { [f.key]: wasOpen, ...rest } = o; return wasOpen === undefined ? rest : { ...rest, [`${editing.date}|${name}`]: wasOpen } })
       setSelectedDate(editing.date)   // follow the folder to its new day
       setNotice({ kind: 'ok', text: `✓ Folder saved: ${folderLabel({ date: editing.date, name })} (${f.photos.length} photo${f.photos.length === 1 ? '' : 's'}).` })
       setEditing(null)
@@ -402,7 +427,7 @@ export default function ProjectPhotosPage() {
 
   const current = lbPhotos[lbIdx]
   const dateOk = saneDate(selectedDate)
-  const dayFolders = folders.filter(f => f.date === selectedDate)
+  const dayFolders = dayFoldersAll
   const otherFolders = folders.filter(f => f.date !== selectedDate)
   // one chip per day that has photos (folders are already sorted newest first)
   const daysWithPhotos = Array.from(folders.reduce((m, f) => m.set(f.date, (m.get(f.date) || 0) + f.photos.length), new Map<string, number>()).entries())
@@ -420,7 +445,7 @@ export default function ProjectPhotosPage() {
             <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>{f.photos.length} photo{f.photos.length === 1 ? '' : 's'}</span>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {isAdmin && <button disabled={busy || !!uploading} onClick={() => { setSelectedDate(f.date); setFolderName(f.name); fileInput.current?.click() }} style={smallBtn(BLUE)}>＋ Add photos</button>}
+            {isAdmin && <button disabled={busy || !!uploading} onClick={() => { setSelectedDate(f.date); setTargetChoice({ date: f.date, key: f.key }); fileInput.current?.click() }} style={smallBtn(BLUE)}>＋ Add photos</button>}
             <button disabled={busy} onClick={() => downloadFolderZip(f)} style={smallBtn('#f3f4f6', '#374151')}>⬇ ZIP</button>
             {isAdmin && <button disabled={busy} onClick={() => setEditing({ key: f.key, date: f.date, name: f.name })} style={smallBtn('#f3f4f6', '#374151')}>✏️ Rename</button>}
             {isAdmin && <button disabled={busy} onClick={() => deletePhotos(f.photos.map(p => p.id), `the folder "${folderLabel(f)}" with ${f.photos.length} photo(s)`, f.key)} style={smallBtn('#fef2f2', DELETE_RED)}>🗑 Delete folder</button>}
@@ -473,17 +498,19 @@ export default function ProjectPhotosPage() {
             <button onClick={() => setSelectedDate(todayLocal())} style={{ ...smallBtn('#f3f4f6', '#374151'), padding: '10px 12px' }}>Today</button>
             {isAdmin && (
               <>
-                <div style={{ flex: '1 1 220px' }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Folder name for new photos <span style={{ color: '#9ca3af' }}>(optional)</span></label>
-                  <input value={folderName} onChange={e => setFolderName(e.target.value)} maxLength={80} placeholder="e.g. Site visit, Drone flight" style={{ ...inputStyle, width: '100%' }} />
-                </div>
-                {folders.length > 0 && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>…or use an existing folder</label>
-                    <select value="" onChange={e => { const f = folders.find(x => x.key === e.target.value); if (f) { setSelectedDate(f.date); setFolderName(f.name) } }} style={inputStyle}>
-                      <option value="">Choose…</option>
-                      {folders.map(f => <option key={f.key} value={f.key}>{folderLabel(f)}</option>)}
+                {dayFoldersAll.length > 0 && (
+                  <div style={{ flex: '1 1 260px' }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Save into</label>
+                    <select value={effTargetKey} onChange={e => setTargetChoice({ date: selectedDate, key: e.target.value })} style={{ ...inputStyle, width: '100%' }}>
+                      {dayFoldersAll.map(f => <option key={f.key} value={f.key}>📁 {f.name || '(no name)'} — {f.photos.length} photo{f.photos.length === 1 ? '' : 's'}</option>)}
+                      <option value="new">＋ A new, separate folder for {selectedDate || 'this day'}…</option>
                     </select>
+                  </div>
+                )}
+                {effTargetKey === 'new' && (
+                  <div style={{ flex: '1 1 260px' }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>{dayFoldersAll.length ? 'Name of the new folder' : 'Folder name'} <span style={{ color: '#9ca3af' }}>{dayFoldersAll.length ? '' : '(optional)'}</span></label>
+                    <input value={folderName} onChange={e => setFolderName(e.target.value)} maxLength={80} placeholder="e.g. Site visit, Drone flight" style={{ ...inputStyle, width: '100%' }} />
                   </div>
                 )}
               </>
@@ -512,7 +539,7 @@ export default function ProjectPhotosPage() {
                 style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, background: dragOver ? '#eff6ff' : '#f9fafb', borderRadius: 10, padding: '22px 12px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer', color: '#6b7280', fontSize: 14 }}>
                 {uploading
                   ? `Uploading ${uploading.done} / ${uploading.total}…`
-                  : <>📷 Drop photos here, or tap to choose them<div style={{ fontSize: 12, marginTop: 4 }}>They will be saved in the folder <strong style={{ color: '#374151' }}>{folderLabel({ date: selectedDate || '—', name: cleanName(folderName) })}</strong> when you press Save</div></>}
+                  : <>📷 Drop photos here, or tap to choose them<div style={{ fontSize: 12, marginTop: 4 }}>They will be saved in {targetFolder ? <>the existing folder <strong style={{ color: '#374151' }}>{folderLabel(targetFolder)}</strong> ({targetFolder.photos.length} photo{targetFolder.photos.length === 1 ? '' : 's'} so far)</> : <>a new folder <strong style={{ color: '#374151' }}>{folderLabel({ date: selectedDate || '—', name: destination.name })}</strong></>} when you press Save</div></>}
               </div>
               <input ref={fileInput} type="file" accept="image/*" multiple style={{ display: 'none' }}
                 onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; stageFiles(fs) }} />
