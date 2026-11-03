@@ -63,7 +63,8 @@ export default function ProjectPhotosPage() {
   const [loadError, setLoadError] = useState('')
   const isAdmin = me?.role === 'admin'
 
-  const [folderDate, setFolderDate] = useState(todayLocal())
+  // The selected day drives everything: the folder(s) shown on top, and where new photos go.
+  const [selectedDate, setSelectedDate] = useState(todayLocal())
   const [folderName, setFolderName] = useState('')
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -95,7 +96,12 @@ export default function ProjectPhotosPage() {
         ])
         setProjectName(project?.name || '')
         if (!list.ok) setLoadError(list.body?.error || 'Could not load the photos.')
-        else setPhotos(Array.isArray(list.body) ? list.body : [])
+        else {
+          const rows: Photo[] = Array.isArray(list.body) ? list.body : []
+          setPhotos(rows)
+          // Admins start on today (that's where they upload); viewers start on the newest day that has photos
+          if (m.user.role !== 'admin' && rows.length) setSelectedDate(rows.map(r => r.folder_date).sort().pop()!)
+        }
       } catch {
         setLoadError('Could not load the photos.')
       }
@@ -115,12 +121,11 @@ export default function ProjectPhotosPage() {
     return list.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name))
   }, [photos])
 
-  const isOpen = (f: Folder, idx: number) => open[f.key] ?? idx === 0   // newest folder starts open, the rest closed
 
   // ---------------- upload ----------------
   async function uploadFiles(files: File[]) {
     if (!isAdmin || !files.length || uploading) return
-    if (!saneDate(folderDate)) { alert('Pick a valid folder date (year 2000–2100).'); return }
+    if (!saneDate(selectedDate)) { alert('Pick a valid date (year 2000–2100).'); return }
     const images = files.filter(f => f.type.startsWith('image/'))
     const notImages = files.length - images.length
     if (!images.length) { alert('Only image files can be added here.'); return }
@@ -133,12 +138,11 @@ export default function ProjectPhotosPage() {
         if (!/^data:image\/(jpeg|png|webp|gif);base64,/.test(small)) throw new Error('unsupported image format')
         const res = await fetch(`/api/projects/${projectId}/photos`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photo: small, folder_date: folderDate, folder_name: cleanName(folderName) }),
+          body: JSON.stringify({ photo: small, folder_date: selectedDate, folder_name: cleanName(folderName) }),
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.error || `error ${res.status}`)
         setPhotos(prev => [...prev, data])
-        setOpen(o => ({ ...o, [`${data.folder_date}|${data.folder_name}`]: true }))
       } catch (e: any) {
         failed.push(`${f.name}: ${e.message}`)
       }
@@ -167,6 +171,7 @@ export default function ProjectPhotosPage() {
       const ids = new Set(f.photos.map(p => p.id))
       setPhotos(prev => prev.map(p => ids.has(p.id) ? { ...p, folder_date: editing.date, folder_name: name } : p))
       setOpen(o => { const { [f.key]: wasOpen, ...rest } = o; return { ...rest, [`${editing.date}|${name}`]: wasOpen ?? true } })
+      setSelectedDate(editing.date)   // follow the folder to its new day
       setEditing(null)
     } catch (e: any) {
       alert(`Could not change the folder: ${e.message}`)
@@ -333,111 +338,151 @@ export default function ProjectPhotosPage() {
   )
 
   const current = lbPhotos[lbIdx]
+  const dateOk = saneDate(selectedDate)
+  const dayFolders = folders.filter(f => f.date === selectedDate)
+  const otherFolders = folders.filter(f => f.date !== selectedDate)
+  // one chip per day that has photos (folders are already sorted newest first)
+  const daysWithPhotos = Array.from(folders.reduce((m, f) => m.set(f.date, (m.get(f.date) || 0) + f.photos.length), new Map<string, number>()).entries())
+
+  const renderFolder = (f: Folder, pinned: boolean) => {
+    const expanded = pinned || (open[f.key] ?? false)
+    const busy = busyKey === f.key
+    const isEditing = editing?.key === f.key
+    return (
+      <div key={f.key} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', marginBottom: 12, overflow: 'hidden', opacity: busy ? 0.6 : 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', flexWrap: 'wrap' }}>
+          <div onClick={() => { if (!pinned) setOpen(o => ({ ...o, [f.key]: !expanded })) }} style={{ flex: '1 1 200px', cursor: pinned ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            {!pinned && <span style={{ color: '#9ca3af', fontSize: 12, width: 12 }}>{expanded ? '▼' : '▶'}</span>}
+            <span style={{ fontSize: 15, fontWeight: 600, color: MCORE_DARK, overflow: 'hidden', textOverflow: 'ellipsis' }}>📁 {folderLabel(f)}</span>
+            <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>{f.photos.length} photo{f.photos.length === 1 ? '' : 's'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {isAdmin && <button disabled={busy || !!uploading} onClick={() => { setSelectedDate(f.date); setFolderName(f.name); fileInput.current?.click() }} style={smallBtn(BLUE)}>＋ Add photos</button>}
+            <button disabled={busy} onClick={() => downloadFolderZip(f)} style={smallBtn('#f3f4f6', '#374151')}>⬇ ZIP</button>
+            {isAdmin && <button disabled={busy} onClick={() => setEditing({ key: f.key, date: f.date, name: f.name })} style={smallBtn('#f3f4f6', '#374151')}>✏️ Rename</button>}
+            {isAdmin && <button disabled={busy} onClick={() => deletePhotos(f.photos.map(p => p.id), `the folder "${folderLabel(f)}" with ${f.photos.length} photo(s)`, f.key)} style={smallBtn('#fef2f2', DELETE_RED)}>🗑 Delete folder</button>}
+          </div>
+        </div>
+
+        {isEditing && editing && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '0 16px 12px' }}>
+            <input type="date" min="2000-01-01" max="2100-12-31" value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} style={inputStyle} />
+            <input value={editing.name} maxLength={80} placeholder="Folder name" onChange={e => setEditing({ ...editing, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 200px' }} />
+            <button onClick={saveFolderEdit} style={{ ...smallBtn(BLUE), padding: '9px 14px' }}>Save</button>
+            <button onClick={() => setEditing(null)} style={{ ...smallBtn('#f3f4f6', '#374151'), padding: '9px 14px' }}>Cancel</button>
+          </div>
+        )}
+
+        {expanded && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, padding: '0 16px 16px' }}>
+            {f.photos.map((p, i) => (
+              <div key={p.id} style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', cursor: 'pointer' }}
+                onClick={() => setLb({ key: f.key, i })}>
+                <img src={p.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                {isAdmin && (
+                  <button title="Delete photo" onClick={e => { e.stopPropagation(); deletePhotos([p.id], 'this photo', f.key) }}
+                    style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 99, border: 'none', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#FAF9F6' }}>
       {header}
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px 80px' }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, color: MCORE_DARK, margin: '0 0 4px' }}>{projectName || 'Project'} — photos</h1>
         <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 18px' }}>
-          Photos that belong to the project itself, not to a weekly report. Grouped in folders by date.
+          Photos that belong to the project itself, not to a weekly report. Pick a day to see its folder{isAdmin ? ' and to add photos to it' : ''}.
           {!isAdmin && ' Only an admin can add or remove photos.'}
         </p>
 
-        {isAdmin && (
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18, marginBottom: 22 }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Folder date</label>
-                <input type="date" min="2000-01-01" max="2100-12-31" value={folderDate} onChange={e => setFolderDate(e.target.value)} style={inputStyle} />
-              </div>
-              <div style={{ flex: '1 1 220px' }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Folder name <span style={{ color: '#9ca3af' }}>(optional)</span></label>
-                <input value={folderName} onChange={e => setFolderName(e.target.value)} maxLength={80} placeholder="e.g. Site visit, Drone flight" style={{ ...inputStyle, width: '100%' }} />
-              </div>
-              {folders.length > 0 && (
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>…or use an existing folder</label>
-                  <select value="" onChange={e => { const f = folders.find(x => x.key === e.target.value); if (f) { setFolderDate(f.date); setFolderName(f.name) } }} style={inputStyle}>
-                    <option value="">Choose…</option>
-                    {folders.map(f => <option key={f.key} value={f.key}>{folderLabel(f)}</option>)}
-                  </select>
+        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 18, marginBottom: 22 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: daysWithPhotos.length || isAdmin ? 12 : 0 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Day</label>
+              <input type="date" min="2000-01-01" max="2100-12-31" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={inputStyle} />
+            </div>
+            <button onClick={() => setSelectedDate(todayLocal())} style={{ ...smallBtn('#f3f4f6', '#374151'), padding: '10px 12px' }}>Today</button>
+            {isAdmin && (
+              <>
+                <div style={{ flex: '1 1 220px' }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Folder name for new photos <span style={{ color: '#9ca3af' }}>(optional)</span></label>
+                  <input value={folderName} onChange={e => setFolderName(e.target.value)} maxLength={80} placeholder="e.g. Site visit, Drone flight" style={{ ...inputStyle, width: '100%' }} />
                 </div>
-              )}
-            </div>
-            <div
-              onClick={() => !uploading && fileInput.current?.click()}
-              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); uploadFiles(Array.from(e.dataTransfer.files)) }}
-              style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, background: dragOver ? '#eff6ff' : '#f9fafb', borderRadius: 10, padding: '22px 12px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer', color: '#6b7280', fontSize: 14 }}>
-              {uploading
-                ? `Uploading ${uploading.done} / ${uploading.total}…`
-                : <>📷 Drop photos here, or tap to choose them<div style={{ fontSize: 12, marginTop: 4 }}>They go into the folder <strong style={{ color: '#374151' }}>{folderLabel({ date: folderDate || '—', name: cleanName(folderName) })}</strong></div></>}
-            </div>
-            <input ref={fileInput} type="file" accept="image/*" multiple style={{ display: 'none' }}
-              onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; uploadFiles(fs) }} />
+                {folders.length > 0 && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>…or use an existing folder</label>
+                    <select value="" onChange={e => { const f = folders.find(x => x.key === e.target.value); if (f) { setSelectedDate(f.date); setFolderName(f.name) } }} style={inputStyle}>
+                      <option value="">Choose…</option>
+                      {folders.map(f => <option key={f.key} value={f.key}>{folderLabel(f)}</option>)}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
+
+          {daysWithPhotos.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: isAdmin ? 14 : 0 }}>
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>Days with photos:</span>
+              {daysWithPhotos.map(([d, n]) => (
+                <button key={d} onClick={() => setSelectedDate(d)}
+                  style={{ border: d === selectedDate ? `1px solid ${BLUE}` : '1px solid #e5e7eb', background: d === selectedDate ? '#eff6ff' : '#f9fafb', color: d === selectedDate ? BLUE : '#374151', fontWeight: d === selectedDate ? 700 : 500, borderRadius: 99, padding: '3px 10px', fontSize: 12, cursor: 'pointer' }}>
+                  {d} <span style={{ opacity: 0.6 }}>· {n}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isAdmin && (
+            <>
+              <div
+                onClick={() => !uploading && fileInput.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); uploadFiles(Array.from(e.dataTransfer.files)) }}
+                style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, background: dragOver ? '#eff6ff' : '#f9fafb', borderRadius: 10, padding: '22px 12px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer', color: '#6b7280', fontSize: 14 }}>
+                {uploading
+                  ? `Uploading ${uploading.done} / ${uploading.total}…`
+                  : <>📷 Drop photos here, or tap to choose them<div style={{ fontSize: 12, marginTop: 4 }}>They go into the folder <strong style={{ color: '#374151' }}>{folderLabel({ date: selectedDate || '—', name: cleanName(folderName) })}</strong></div></>}
+              </div>
+              <input ref={fileInput} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; uploadFiles(fs) }} />
+            </>
+          )}
+        </div>
 
         {loadError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>{loadError}</div>}
 
-        {!loadError && folders.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: '40px 0' }}>No project photos yet.</div>
-        )}
-
-        {folders.length > 1 && (
-          <div style={{ fontSize: 12, marginBottom: 10 }}>
-            <button onClick={() => setOpen(Object.fromEntries(folders.map(f => [f.key, true])))} style={{ background: 'none', border: 'none', color: BLUE, cursor: 'pointer', padding: 0 }}>Expand all</button>
-            {' · '}
-            <button onClick={() => setOpen(Object.fromEntries(folders.map(f => [f.key, false])))} style={{ background: 'none', border: 'none', color: BLUE, cursor: 'pointer', padding: 0 }}>Collapse all</button>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: 0.5, margin: '0 0 8px' }}>{dateOk ? selectedDate : 'NO DATE SELECTED'}</h2>
+        {!dateOk && <div style={{ color: '#9ca3af', fontSize: 14, marginBottom: 14 }}>Pick a valid date (year 2000–2100).</div>}
+        {dateOk && dayFolders.map(f => renderFolder(f, true))}
+        {dateOk && dayFolders.length === 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px dashed #d1d5db', padding: '16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: MCORE_DARK }}>📁 {selectedDate}</span>
+            <span style={{ fontSize: 13, color: '#9ca3af', flex: '1 1 200px' }}>Empty — no photos for this day.</span>
+            {isAdmin && <button disabled={!!uploading} onClick={() => fileInput.current?.click()} style={smallBtn(BLUE)}>＋ Add photos</button>}
           </div>
         )}
 
-        {folders.map((f, idx) => {
-          const expanded = isOpen(f, idx)
-          const busy = busyKey === f.key
-          const isEditing = editing?.key === f.key
-          return (
-            <div key={f.key} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', marginBottom: 12, overflow: 'hidden', opacity: busy ? 0.6 : 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', flexWrap: 'wrap' }}>
-                <div onClick={() => setOpen(o => ({ ...o, [f.key]: !expanded }))} style={{ flex: '1 1 200px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  <span style={{ color: '#9ca3af', fontSize: 12, width: 12 }}>{expanded ? '▼' : '▶'}</span>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: MCORE_DARK, overflow: 'hidden', textOverflow: 'ellipsis' }}>📁 {folderLabel(f)}</span>
-                  <span style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>{f.photos.length} photo{f.photos.length === 1 ? '' : 's'}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button disabled={busy} onClick={() => downloadFolderZip(f)} style={smallBtn('#f3f4f6', '#374151')}>⬇ ZIP</button>
-                  {isAdmin && <button disabled={busy} onClick={() => setEditing({ key: f.key, date: f.date, name: f.name })} style={smallBtn('#f3f4f6', '#374151')}>✏️ Rename</button>}
-                  {isAdmin && <button disabled={busy} onClick={() => deletePhotos(f.photos.map(p => p.id), `the folder "${folderLabel(f)}" with ${f.photos.length} photo(s)`, f.key)} style={smallBtn('#fef2f2', DELETE_RED)}>🗑 Delete folder</button>}
-                </div>
-              </div>
-
-              {isEditing && editing && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '0 16px 12px' }}>
-                  <input type="date" min="2000-01-01" max="2100-12-31" value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} style={inputStyle} />
-                  <input value={editing.name} maxLength={80} placeholder="Folder name" onChange={e => setEditing({ ...editing, name: e.target.value })} style={{ ...inputStyle, flex: '1 1 200px' }} />
-                  <button onClick={saveFolderEdit} style={{ ...smallBtn(BLUE), padding: '9px 14px' }}>Save</button>
-                  <button onClick={() => setEditing(null)} style={{ ...smallBtn('#f3f4f6', '#374151'), padding: '9px 14px' }}>Cancel</button>
-                </div>
-              )}
-
-              {expanded && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, padding: '0 16px 16px' }}>
-                  {f.photos.map((p, i) => (
-                    <div key={p.id} style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 8, overflow: 'hidden', background: '#f3f4f6', cursor: 'pointer' }}
-                      onClick={() => setLb({ key: f.key, i })}>
-                      <img src={p.url} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      {isAdmin && (
-                        <button title="Delete photo" onClick={e => { e.stopPropagation(); deletePhotos([p.id], 'this photo', f.key) }}
-                          style={{ position: 'absolute', top: 5, right: 5, width: 24, height: 24, borderRadius: 99, border: 'none', background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>✕</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+        {otherFolders.length > 0 && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '22px 0 8px' }}>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', letterSpacing: 0.5, margin: 0 }}>{dayFolders.length || dateOk ? 'OTHER DAYS' : 'ALL FOLDERS'}</h2>
+              <span style={{ fontSize: 12 }}>
+                <button onClick={() => setOpen(Object.fromEntries(otherFolders.map(f => [f.key, true])))} style={{ background: 'none', border: 'none', color: BLUE, cursor: 'pointer', padding: 0 }}>Expand all</button>
+                {' · '}
+                <button onClick={() => setOpen(Object.fromEntries(otherFolders.map(f => [f.key, false])))} style={{ background: 'none', border: 'none', color: BLUE, cursor: 'pointer', padding: 0 }}>Collapse all</button>
+              </span>
             </div>
-          )
-        })}
+            {otherFolders.map(f => renderFolder(f, false))}
+          </>
+        )}
       </div>
 
       {lb && lbFolder && current && (
