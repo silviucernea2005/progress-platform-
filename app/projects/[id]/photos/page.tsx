@@ -11,6 +11,8 @@ const DELETE_RED = '#B3261E'
 
 type Photo = { id: string; folder_date: string; folder_name: string; url: string; created_at: string }
 type Folder = { key: string; date: string; name: string; photos: Photo[] }
+type Pending = { id: string; file: File; preview: string }   // chosen but NOT saved yet
+type Notice = { kind: 'ok' | 'warn' | 'error'; text: string }
 
 const inputStyle: any = { border: '1px solid #d1d5db', borderRadius: 7, padding: '8px 11px', fontSize: 14, outline: 'none', boxSizing: 'border-box', background: '#fff' }
 const smallBtn = (bg: string, color = '#fff'): any => ({ background: bg, color, border: 'none', borderRadius: 7, padding: '6px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer' })
@@ -69,6 +71,8 @@ export default function ProjectPhotosPage() {
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInput = useRef<HTMLInputElement | null>(null)
+  const [pending, setPending] = useState<Pending[]>([])
+  const [notice, setNotice] = useState<Notice | null>(null)
 
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [editing, setEditing] = useState<{ key: string; date: string; name: string } | null>(null)
@@ -122,35 +126,80 @@ export default function ProjectPhotosPage() {
   }, [photos])
 
 
-  // ---------------- upload ----------------
-  async function uploadFiles(files: File[]) {
-    if (!isAdmin || !files.length || uploading) return
-    if (!saneDate(selectedDate)) { alert('Pick a valid date (year 2000–2100).'); return }
+  // ---------------- upload: choose photos -> press Save -> verified against the server ----------------
+  const makePreview = (f: File) => { try { return URL.createObjectURL(f) } catch { return '' } }
+  const dropPreview = (u: string) => { try { if (u) URL.revokeObjectURL(u) } catch {} }
+
+  function stageFiles(files: File[]) {
+    if (!isAdmin || uploading || !files.length) return
     const images = files.filter(f => f.type.startsWith('image/'))
-    const notImages = files.length - images.length
-    if (!images.length) { alert('Only image files can be added here.'); return }
-    const failed: string[] = []
-    setUploading({ done: 0, total: images.length })
-    for (let i = 0; i < images.length; i++) {
-      const f = images[i]
+    const skipped = files.length - images.length
+    setNotice(skipped ? { kind: 'warn', text: `${skipped} file${skipped === 1 ? ' was' : 's were'} skipped — only images can be added here.` } : null)
+    if (!images.length) return
+    setPending(prev => [...prev, ...images.map(f => ({ id: `${f.name}-${f.size}-${f.lastModified}-${Math.random().toString(36).slice(2, 8)}`, file: f, preview: makePreview(f) }))])
+  }
+
+  function removePending(id: string) {
+    setPending(prev => { prev.filter(p => p.id === id).forEach(p => dropPreview(p.preview)); return prev.filter(p => p.id !== id) })
+  }
+  function clearPending() {
+    setPending(prev => { prev.forEach(p => dropPreview(p.preview)); return [] })
+  }
+
+  async function savePending() {
+    if (!isAdmin || uploading || !pending.length) return
+    if (!saneDate(selectedDate)) { alert('Pick a valid date (year 2000–2100).'); return }
+    const date = selectedDate, name = cleanName(folderName), label = folderLabel({ date, name })
+    const batch = pending
+    const failed: { p: Pending; msg: string }[] = []
+    const savedIds: string[] = []
+    setNotice(null)
+    setUploading({ done: 0, total: batch.length })
+    for (let i = 0; i < batch.length; i++) {
+      const p = batch[i]
       try {
-        const small = await compress(await readAsDataUrl(f))
+        const small = await compress(await readAsDataUrl(p.file))
         if (!/^data:image\/(jpeg|png|webp|gif);base64,/.test(small)) throw new Error('unsupported image format')
         const res = await fetch(`/api/projects/${projectId}/photos`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ photo: small, folder_date: selectedDate, folder_name: cleanName(folderName) }),
+          body: JSON.stringify({ photo: small, folder_date: date, folder_name: name }),
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data.error || `error ${res.status}`)
-        setPhotos(prev => [...prev, data])
+        savedIds.push(data.id)
       } catch (e: any) {
-        failed.push(`${f.name}: ${e.message}`)
+        failed.push({ p, msg: e.message })
       }
-      setUploading({ done: i + 1, total: images.length })
+      setUploading({ done: i + 1, total: batch.length })
     }
     setUploading(null)
-    if (notImages) failed.push(`${notImages} file(s) were not images and were skipped.`)
-    if (failed.length) alert(`Some files could not be added:\n\n${failed.slice(0, 8).join('\n')}${failed.length > 8 ? `\n…and ${failed.length - 8} more` : ''}`)
+
+    // saved photos leave the "not saved yet" list; failed ones stay so Save can simply be pressed again
+    const failedIds = new Set(failed.map(f => f.p.id))
+    batch.forEach(p => { if (!failedIds.has(p.id)) dropPreview(p.preview) })
+    setPending(prev => prev.filter(p => failedIds.has(p.id) || !batch.some(b => b.id === p.id)))
+
+    // don't just trust the uploads: read the folder back from the server and count what is really there
+    let fresh: Photo[] | null = null
+    try {
+      const r = await fetch(`/api/projects/${projectId}/photos`)
+      if (r.ok) { const rows = await r.json(); if (Array.isArray(rows)) fresh = rows }
+    } catch {}
+    if (fresh) setPhotos(fresh)
+    const confirmed = fresh ? savedIds.filter(id => fresh!.some(x => x.id === id)).length : savedIds.length
+    const inFolder = fresh ? fresh.filter(x => x.folder_date === date && x.folder_name === name).length : null
+    const plural = (n: number) => `${n} photo${n === 1 ? '' : 's'}`
+
+    if (!savedIds.length) {
+      setNotice({ kind: 'error', text: `Nothing was saved. ${failed.slice(0, 3).map(f => `${f.p.file.name}: ${f.msg}`).join(' · ')}` })
+    } else if (failed.length || confirmed < savedIds.length) {
+      const parts = [`${plural(confirmed)} saved in folder "${label}".`]
+      if (failed.length) parts.push(`${plural(failed.length)} NOT saved (still in the list above — press Save to try again): ${failed.slice(0, 3).map(f => `${f.p.file.name}: ${f.msg}`).join(' · ')}`)
+      if (confirmed < savedIds.length) parts.push(`${plural(savedIds.length - confirmed)} reported as saved but not found on the server — please check.`)
+      setNotice({ kind: 'warn', text: parts.join(' ') })
+    } else {
+      setNotice({ kind: 'ok', text: `✓ Saved: ${plural(confirmed)} in folder "${label}".${inFolder !== null ? ` The folder now has ${plural(inFolder)}.` : ''}` })
+    }
   }
 
   // ---------------- folder / photo actions (admin) ----------------
@@ -172,6 +221,7 @@ export default function ProjectPhotosPage() {
       setPhotos(prev => prev.map(p => ids.has(p.id) ? { ...p, folder_date: editing.date, folder_name: name } : p))
       setOpen(o => { const { [f.key]: wasOpen, ...rest } = o; return { ...rest, [`${editing.date}|${name}`]: wasOpen ?? true } })
       setSelectedDate(editing.date)   // follow the folder to its new day
+      setNotice({ kind: 'ok', text: `✓ Folder saved: ${folderLabel({ date: editing.date, name })} (${f.photos.length} photo${f.photos.length === 1 ? '' : 's'}).` })
       setEditing(null)
     } catch (e: any) {
       alert(`Could not change the folder: ${e.message}`)
@@ -188,6 +238,7 @@ export default function ProjectPhotosPage() {
       if (!res.ok) throw new Error(data.error || `error ${res.status}`)
       const gone = new Set(ids)
       setPhotos(prev => prev.filter(p => !gone.has(p.id)))
+      setNotice({ kind: 'ok', text: `✓ Deleted ${ids.length} photo${ids.length === 1 ? '' : 's'}.` })
     } catch (e: any) {
       alert(`Could not delete: ${e.message}`)
     }
@@ -237,6 +288,18 @@ export default function ProjectPhotosPage() {
       alert('Could not create the ZIP file.')
     }
     setBusyKey(null)
+  }
+
+  // warn before closing/reloading the tab with photos that were chosen but not saved
+  useEffect(() => {
+    if (!pending.length && !uploading) return
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [pending.length, !!uploading])
+  const leave = (go: () => void) => {
+    if ((pending.length || uploading) && !confirm('You have photos that are not saved yet. Leave without saving them?')) return
+    go()
   }
 
   // ---------------- lightbox mechanics ----------------
@@ -312,7 +375,7 @@ export default function ProjectPhotosPage() {
   // ---------------- render ----------------
   const header = (
     <header style={{ position: 'sticky', top: 0, zIndex: 100, background: NAV_BG, color: '#fff', padding: '12px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-      <div onClick={() => router.push('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+      <div onClick={() => leave(() => router.push('/dashboard'))} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
         <div style={{ background: MCORE_RED, borderRadius: 6, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, color: '#fff', flexShrink: 0 }}>M</div>
         <div>
           <span style={{ fontWeight: 800, fontSize: 13, color: '#fff', letterSpacing: 0.2 }}>M°Core</span>
@@ -321,7 +384,7 @@ export default function ProjectPhotosPage() {
         </div>
         <span className="s7-header-subtitle" style={{ fontWeight: 500, fontSize: 14, color: 'rgba(255,255,255,0.75)', marginLeft: 8 }}>Project photos</span>
       </div>
-      <button onClick={() => router.back()} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 13, padding: '6px 14px' }}>← Back</button>
+      <button onClick={() => leave(() => router.back())} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 20, color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 13, padding: '6px 14px' }}>← Back</button>
     </header>
   )
 
@@ -445,17 +508,52 @@ export default function ProjectPhotosPage() {
                 onClick={() => !uploading && fileInput.current?.click()}
                 onDragOver={e => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
-                onDrop={e => { e.preventDefault(); setDragOver(false); uploadFiles(Array.from(e.dataTransfer.files)) }}
+                onDrop={e => { e.preventDefault(); setDragOver(false); stageFiles(Array.from(e.dataTransfer.files)) }}
                 style={{ border: `2px dashed ${dragOver ? BLUE : '#d1d5db'}`, background: dragOver ? '#eff6ff' : '#f9fafb', borderRadius: 10, padding: '22px 12px', textAlign: 'center', cursor: uploading ? 'default' : 'pointer', color: '#6b7280', fontSize: 14 }}>
                 {uploading
                   ? `Uploading ${uploading.done} / ${uploading.total}…`
-                  : <>📷 Drop photos here, or tap to choose them<div style={{ fontSize: 12, marginTop: 4 }}>They go into the folder <strong style={{ color: '#374151' }}>{folderLabel({ date: selectedDate || '—', name: cleanName(folderName) })}</strong></div></>}
+                  : <>📷 Drop photos here, or tap to choose them<div style={{ fontSize: 12, marginTop: 4 }}>They will be saved in the folder <strong style={{ color: '#374151' }}>{folderLabel({ date: selectedDate || '—', name: cleanName(folderName) })}</strong> when you press Save</div></>}
               </div>
               <input ref={fileInput} type="file" accept="image/*" multiple style={{ display: 'none' }}
-                onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; uploadFiles(fs) }} />
+                onChange={e => { const fs = Array.from(e.target.files || []); e.target.value = ''; stageFiles(fs) }} />
+
+              {pending.length > 0 && (
+                <div style={{ marginTop: 12, border: '1px solid #fde68a', background: '#fffbeb', borderRadius: 10, padding: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 8 }}>
+                    Not saved yet — {pending.length} photo{pending.length === 1 ? '' : 's'} waiting for Save
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {pending.map(p => (
+                      <div key={p.id} title={p.file.name} style={{ position: 'relative', width: 64, height: 64, borderRadius: 6, overflow: 'hidden', background: '#e5e7eb' }}>
+                        {p.preview && <img src={p.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                        {!uploading && <button title="Remove from the list" onClick={() => removePending(p.id)}
+                          style={{ position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: 99, border: 'none', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, cursor: 'pointer', lineHeight: 1 }}>✕</button>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+                <button onClick={savePending} disabled={!pending.length || !!uploading}
+                  style={{ ...smallBtn(pending.length && !uploading ? GREEN : '#d1d5db', pending.length && !uploading ? '#fff' : '#6b7280'), padding: '10px 20px', fontSize: 14, cursor: pending.length && !uploading ? 'pointer' : 'default' }}>
+                  {uploading ? `Saving ${uploading.done} / ${uploading.total}…` : pending.length ? `💾 Save ${pending.length} photo${pending.length === 1 ? '' : 's'}` : '💾 Save'}
+                </button>
+                {pending.length > 0 && !uploading && <button onClick={clearPending} style={{ ...smallBtn('#f3f4f6', '#374151'), padding: '10px 14px', fontSize: 13 }}>Clear list</button>}
+                {!pending.length && !uploading && <span style={{ fontSize: 12, color: '#9ca3af' }}>Choose photos first — nothing is saved until you press Save.</span>}
+              </div>
             </>
           )}
         </div>
+
+        {notice && (
+          <div role="status" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', borderRadius: 10, padding: '11px 14px', fontSize: 13, marginBottom: 14, border: '1px solid',
+            background: notice.kind === 'ok' ? '#ecfdf5' : notice.kind === 'warn' ? '#fffbeb' : '#fef2f2',
+            borderColor: notice.kind === 'ok' ? '#a7f3d0' : notice.kind === 'warn' ? '#fde68a' : '#fecaca',
+            color: notice.kind === 'ok' ? '#065f46' : notice.kind === 'warn' ? '#92400e' : '#991b1b' }}>
+            <span style={{ flex: 1 }}>{notice.text}</span>
+            <button onClick={() => setNotice(null)} title="Dismiss" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
+          </div>
+        )}
 
         {loadError && <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>{loadError}</div>}
 
